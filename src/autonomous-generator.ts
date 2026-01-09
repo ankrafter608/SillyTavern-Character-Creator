@@ -7,6 +7,7 @@ export interface ChatMessage {
     content: string;
     timestamp: number;
     fieldsUpdated?: string[];
+    isError?: boolean;
 }
 
 export interface CharacterData {

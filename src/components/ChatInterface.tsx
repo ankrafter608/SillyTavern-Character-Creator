@@ -11,6 +11,8 @@ interface ChatInterfaceProps {
     profileId: string;
     maxResponseToken?: number;
     kbFiles?: KBFile[];
+    messages: ChatMessage[];
+    onMessagesChange: (messages: ChatMessage[]) => void;
 }
 
 export const ChatInterface: FC<ChatInterfaceProps> = ({
@@ -19,8 +21,9 @@ export const ChatInterface: FC<ChatInterfaceProps> = ({
     profileId,
     maxResponseToken,
     kbFiles,
+    messages,
+    onMessagesChange,
 }) => {
-    const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [input, setInput] = useState('');
     const [isProcessing, setIsProcessing] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -31,7 +34,7 @@ export const ChatInterface: FC<ChatInterfaceProps> = ({
 
     useEffect(() => {
         scrollToBottom();
-    }, [messages]);
+    }, [messages.length]);
 
     const handleSend = useCallback(async () => {
         if (!input.trim() || isProcessing) return;
@@ -42,20 +45,21 @@ export const ChatInterface: FC<ChatInterfaceProps> = ({
             timestamp: Date.now(),
         };
 
-        setMessages((prev) => [...prev, userMessage]);
+        const newMessages = [...messages, userMessage];
+        onMessagesChange(newMessages);
         setInput('');
         setIsProcessing(true);
 
         try {
             const { aiMessage, updatedSession } = await sendChatMessage({
-                messages: [...messages, userMessage],
+                messages: newMessages,
                 session,
                 profileId,
                 maxResponseToken,
                 kbFiles,
             });
 
-            setMessages((prev) => [...prev, aiMessage]);
+            onMessagesChange([...newMessages, aiMessage]);
             onSessionUpdate(updatedSession);
         } catch (error: any) {
             console.error('Chat error:', error);
@@ -63,14 +67,20 @@ export const ChatInterface: FC<ChatInterfaceProps> = ({
 
             const errorMessage: ChatMessage = {
                 role: 'assistant',
-                content: 'Sorry, I encountered an error processing your request. Please try again.',
+                content: `Error occurred: ${error.message || String(error)}`,
                 timestamp: Date.now(),
+                isError: true,
             };
-            setMessages((prev) => [...prev, errorMessage]);
+            onMessagesChange([...newMessages, errorMessage]);
         } finally {
             setIsProcessing(false);
         }
-    }, [input, messages, session, profileId, onSessionUpdate, isProcessing]);
+    }, [input, messages, session, profileId, onSessionUpdate, isProcessing, onMessagesChange, maxResponseToken, kbFiles]);
+
+    const handleDeleteMessage = useCallback((index: number) => {
+        const newMessages = messages.filter((_, i) => i !== index);
+        onMessagesChange(newMessages);
+    }, [messages, onMessagesChange]);
 
     const handleKeyPress = useCallback(
         (e: React.KeyboardEvent) => {
@@ -89,13 +99,13 @@ export const ChatInterface: FC<ChatInterfaceProps> = ({
             'Are you sure you want to clear the chat history?',
         );
         if (confirm) {
-            setMessages([]);
+            onMessagesChange([]);
         }
-    }, []);
+    }, [onMessagesChange]);
 
     return (
         <div className="chat-interface">
-            <div className="chat-header">
+            <div className="chat-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 15px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                 <h3>AI Assistant</h3>
                 <STButton onClick={handleClearChat} className="menu_button secondary small">
                     Clear
@@ -123,12 +133,25 @@ export const ChatInterface: FC<ChatInterfaceProps> = ({
                 )}
 
                 {messages.map((msg, index) => (
-                    <div key={index} className={`chat-message ${msg.role}`}>
-                        <div className="message-avatar">
-                            {msg.role === 'user' ? '👤' : '🤖'}
+                    <div key={index} className={`chat-message ${msg.role} ${msg.isError ? 'error-message' : ''}`}>
+                        {/* Trash can icon for deleting message */}
+                        <div
+                            className="message-actions"
+                            style={{
+                                opacity: 0.3,
+                                cursor: 'pointer',
+                                padding: '5px',
+                                display: 'flex',
+                                alignItems: 'center'
+                            }}
+                            onClick={() => handleDeleteMessage(index)}
+                            title="Delete message"
+                        >
+                            <i className="fa-solid fa-trash-can"></i>
                         </div>
+
                         <div className="message-content">
-                            <div className="message-text">{msg.content}</div>
+                            <div className="message-text" style={{ whiteSpace: 'pre-wrap' }}>{msg.content}</div>
                             {msg.fieldsUpdated && msg.fieldsUpdated.length > 0 && (
                                 <div className="message-updates">
                                     <small>
@@ -137,26 +160,27 @@ export const ChatInterface: FC<ChatInterfaceProps> = ({
                                 </div>
                             )}
                         </div>
+                        <div className="message-avatar">
+                            {msg.role === 'user' ? '👤' : '🤖'}
+                        </div>
                     </div>
                 ))}
 
                 {isProcessing && (
                     <div className="chat-message assistant">
-                        <div className="message-avatar">🤖</div>
                         <div className="message-content">
                             <div className="message-text typing">
-                                <span></span>
-                                <span></span>
-                                <span></span>
+                                <span>.</span><span>.</span><span>.</span>
                             </div>
                         </div>
+                        <div className="message-avatar">🤖</div>
                     </div>
                 )}
 
                 <div ref={messagesEndRef} />
             </div>
 
-            <div className="chat-input-container">
+            <div className="chat-input-area">
                 <STTextarea
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
@@ -165,14 +189,27 @@ export const ChatInterface: FC<ChatInterfaceProps> = ({
                     rows={3}
                     disabled={isProcessing}
                     className="chat-input"
+                    style={{ flex: 1 }}
                 />
-                <STButton
+                <button
                     onClick={handleSend}
                     disabled={!input.trim() || isProcessing}
-                    className="menu_button send-button"
+                    style={{
+                        borderRadius: '50%',
+                        width: '42px',
+                        height: '42px',
+                        padding: 0,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        background: 'var(--accent-gradient)',
+                        border: 'none',
+                        cursor: (!input.trim() || isProcessing) ? 'not-allowed' : 'pointer',
+                        opacity: (!input.trim() || isProcessing) ? 0.7 : 1
+                    }}
                 >
-                    Send
-                </STButton>
+                    <i className="fa-solid fa-paper-plane" style={{ color: 'white' }}></i>
+                </button>
             </div>
         </div>
     );

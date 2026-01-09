@@ -1,4 +1,4 @@
-import { FC, useState, useCallback } from 'react';
+import { FC, useState, useCallback, useRef, useEffect } from 'react';
 import { STButton, STTextarea } from 'sillytavern-utils-lib/components/react';
 import { LorebookData, LorebookEntry } from './LorebookEditor.js';
 import { KBFile } from './KnowledgeBase.js';
@@ -8,6 +8,7 @@ interface ChatMessage {
     content: string;
     timestamp: number;
     entriesUpdated?: string[];
+    isError?: boolean;
 }
 
 interface LorebookChatInterfaceProps {
@@ -16,6 +17,8 @@ interface LorebookChatInterfaceProps {
     profileId: string;
     maxResponseToken?: number;
     kbFiles?: KBFile[];
+    messages: ChatMessage[];
+    onMessagesChange: (messages: ChatMessage[]) => void;
 }
 
 const globalContext = SillyTavern.getContext();
@@ -81,10 +84,20 @@ export const LorebookChatInterface: FC<LorebookChatInterfaceProps> = ({
     profileId,
     maxResponseToken = 3072,
     kbFiles = [],
+    messages,
+    onMessagesChange,
 }) => {
-    const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const messagesEndRef = useRef<HTMLDivElement>(null);
+
+    const scrollToBottom = () => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    };
+
+    useEffect(() => {
+        scrollToBottom();
+    }, [messages.length]);
 
     const handleSend = useCallback(async () => {
         if (!input.trim() || isLoading) return;
@@ -95,7 +108,8 @@ export const LorebookChatInterface: FC<LorebookChatInterfaceProps> = ({
             timestamp: Date.now(),
         };
 
-        setMessages((prev) => [...prev, userMessage]);
+        const newMessages = [...messages, userMessage];
+        onMessagesChange(newMessages);
         setInput('');
         setIsLoading(true);
 
@@ -164,8 +178,9 @@ export const LorebookChatInterface: FC<LorebookChatInterfaceProps> = ({
                     content: `⚠️ I tried to generate entries but my response was malformed. Here's the raw output:\n\n${response.content}\n\n💡 Try increasing "Max Response Tokens" or simplifying your request.`,
                     timestamp: Date.now(),
                     entriesUpdated: [],
+                    isError: true,
                 };
-                setMessages((prev) => [...prev, fallbackMessage]);
+                onMessagesChange([...newMessages, fallbackMessage]);
                 setIsLoading(false);
                 return;
             }
@@ -198,19 +213,36 @@ export const LorebookChatInterface: FC<LorebookChatInterfaceProps> = ({
                 entriesUpdated: data.entriesUpdated || [],
             };
 
-            setMessages((prev) => [...prev, aiMessage]);
+            onMessagesChange([...newMessages, aiMessage]);
         } catch (error: any) {
             console.error('Lorebook chat error:', error);
             const errorMessage: ChatMessage = {
                 role: 'assistant',
-                content: `Sorry, I encountered an error processing your request. Please try again.\n\nError: ${error.message || String(error)}`,
+                content: `Error occurred: ${error.message || String(error)}`,
                 timestamp: Date.now(),
+                isError: true,
             };
-            setMessages((prev) => [...prev, errorMessage]);
+            onMessagesChange([...newMessages, errorMessage]);
         } finally {
             setIsLoading(false);
         }
-    }, [input, isLoading, lorebook, onLorebookChange, profileId, maxResponseToken]);
+    }, [input, isLoading, lorebook, onLorebookChange, profileId, maxResponseToken, kbFiles, messages, onMessagesChange]);
+
+    const handleDeleteMessage = useCallback((index: number) => {
+        const newMessages = messages.filter((_, i) => i !== index);
+        onMessagesChange(newMessages);
+    }, [messages, onMessagesChange]);
+
+    const handleClearChat = useCallback(async () => {
+        const globalContext = SillyTavern.getContext();
+        const confirm = await globalContext.Popup.show.confirm(
+            'Clear Chat',
+            'Are you sure you want to clear the chat history?',
+        );
+        if (confirm) {
+            onMessagesChange([]);
+        }
+    }, [onMessagesChange]);
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
         if (e.key === 'Enter' && !e.shiftKey) {
@@ -221,6 +253,13 @@ export const LorebookChatInterface: FC<LorebookChatInterfaceProps> = ({
 
     return (
         <div className="chat-interface">
+            <div className="chat-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 15px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                <h3>Lorebook Assistant</h3>
+                <STButton onClick={handleClearChat} className="menu_button secondary small">
+                    Clear
+                </STButton>
+            </div>
+
             <div className="chat-messages">
                 {messages.length === 0 && (
                     <div className="chat-welcome">
@@ -238,26 +277,42 @@ export const LorebookChatInterface: FC<LorebookChatInterfaceProps> = ({
                     </div>
                 )}
                 {messages.map((msg, idx) => (
-                    <div key={idx} className={`chat-message ${msg.role}`}>
-                        <span className="message-icon">{msg.role === 'user' ? '👤' : '🤖'}</span>
+                    <div key={idx} className={`chat-message ${msg.role} ${msg.isError ? 'error-message' : ''}`}>
+                        <div
+                            className="message-actions"
+                            style={{
+                                opacity: 0.3,
+                                cursor: 'pointer',
+                                padding: '5px',
+                                display: 'flex',
+                                alignItems: 'center'
+                            }}
+                            onClick={() => handleDeleteMessage(idx)}
+                            title="Delete message"
+                        >
+                            <i className="fa-solid fa-trash-can"></i>
+                        </div>
+
                         <div className="message-content">
-                            {msg.content}
+                            <div className="message-text" style={{ whiteSpace: 'pre-wrap' }}>{msg.content}</div>
                             {msg.entriesUpdated && msg.entriesUpdated.length > 0 && (
                                 <div className="entries-updated">
                                     ✏️ Entries: {msg.entriesUpdated.join(', ')}
                                 </div>
                             )}
                         </div>
+                        <span className="message-icon">{msg.role === 'user' ? '👤' : '🤖'}</span>
                     </div>
                 ))}
                 {isLoading && (
                     <div className="chat-message assistant loading">
-                        <span className="message-icon">🤖</span>
                         <div className="message-content">
                             <i className="fa-solid fa-spinner fa-spin"></i> Creating entries...
                         </div>
+                        <span className="message-icon">🤖</span>
                     </div>
                 )}
+                <div ref={messagesEndRef} />
             </div>
             <div className="chat-input-area">
                 <STTextarea
@@ -267,10 +322,27 @@ export const LorebookChatInterface: FC<LorebookChatInterfaceProps> = ({
                     placeholder="Describe entries to create... (Enter to send, Shift+Enter for new line)"
                     rows={2}
                     disabled={isLoading}
+                    style={{ flex: 1 }}
                 />
-                <STButton onClick={handleSend} disabled={isLoading || !input.trim()}>
-                    {isLoading ? <i className="fa-solid fa-spinner fa-spin"></i> : 'Send'}
-                </STButton>
+                <button
+                    onClick={handleSend}
+                    disabled={isLoading || !input.trim()}
+                    style={{
+                        borderRadius: '50%',
+                        width: '42px',
+                        height: '42px',
+                        padding: 0,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        background: 'var(--accent-gradient)',
+                        border: 'none',
+                        cursor: (isLoading || !input.trim()) ? 'not-allowed' : 'pointer',
+                        opacity: (isLoading || !input.trim()) ? 0.7 : 1
+                    }}
+                >
+                    <i className="fa-solid fa-paper-plane" style={{ color: 'white' }}></i>
+                </button>
             </div>
         </div>
     );

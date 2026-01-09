@@ -3,6 +3,7 @@ import { STButton, STTextarea } from 'sillytavern-utils-lib/components/react';
 import { st_echo } from 'sillytavern-utils-lib/config';
 import { Session } from '../generate.js';
 import { ChatInterface } from './ChatInterface.js';
+import { ChatMessage } from '../autonomous-generator.js';
 
 interface AutonomousModeProps {
     session: Session;
@@ -22,6 +23,7 @@ export const AutonomousMode: FC<AutonomousModeProps> = ({
     const [prompt, setPrompt] = useState('');
     const [includeLorebook, setIncludeLorebook] = useState(false);
     const [showChat, setShowChat] = useState(false);
+    const [messages, setMessages] = useState<ChatMessage[]>([]);
 
     const handleGenerate = useCallback(async () => {
         if (!prompt.trim()) {
@@ -102,6 +104,8 @@ export const AutonomousMode: FC<AutonomousModeProps> = ({
                             session={session}
                             onSessionUpdate={onSessionUpdate}
                             profileId={profileId}
+                            messages={messages}
+                            onMessagesChange={setMessages}
                         />
                     </div>
                 )}

@@ -28,6 +28,7 @@ import { ChatInterface } from './ChatInterface.js';
 import { LorebookEditor, LorebookData, createEmptyLorebook } from './LorebookEditor.js';
 import { LorebookChatInterface } from './LorebookChatInterface.js';
 import { KnowledgeBase, KBFile } from './KnowledgeBase.js';
+import { ChatMessage } from '../autonomous-generator.js';
 // import { generateFullCharacter, applyCharacterToSession } from '../autonomous-generator.js';
 import { exportCharacterAsJSON, exportLorebookAsJSON } from '../character-exporter.js';
 
@@ -96,6 +97,10 @@ export const MainPopup: FC = () => {
   const [creatorMode, setCreatorMode] = useState<'character' | 'lorebook'>('character');
   const [lorebook, setLorebook] = useState<LorebookData>(createEmptyLorebook());
   const [kbFiles, setKbFiles] = useState<KBFile[]>([]);
+
+  // Chat History State
+  const [charMessages, setCharMessages] = useState<ChatMessage[]>([]);
+  const [lorebookMessages, setLorebookMessages] = useState<any[]>([]);
 
   const [allCharacters, setAllCharacters] = useState<Character[]>([]);
   const [allWorldNames, setAllWorldNames] = useState<string[]>([]);
@@ -978,6 +983,8 @@ export const MainPopup: FC = () => {
               profileId={settings.profileId}
               maxResponseToken={settings.maxResponseToken}
               kbFiles={kbFiles}
+              messages={charMessages}
+              onMessagesChange={setCharMessages}
             />
           </div>
         </div>
@@ -1000,6 +1007,8 @@ export const MainPopup: FC = () => {
               profileId={settings.profileId}
               maxResponseToken={settings.maxResponseToken}
               kbFiles={kbFiles}
+              messages={lorebookMessages}
+              onMessagesChange={setLorebookMessages}
             />
           </div>
         </div>
