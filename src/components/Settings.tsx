@@ -1,442 +1,89 @@
-import React, { FC, useState, useMemo, useCallback } from 'react';
-import { st_echo } from 'sillytavern-utils-lib/config';
-import {
-  PresetItem,
-  SortableListItemData,
-  STButton,
-  STPresetSelect,
-  STSortableList,
-  STTextarea,
-} from 'sillytavern-utils-lib/components/react';
-import {
-  convertToVariableName,
-  DEFAULT_PROMPT_CONTENTS,
-  DEFAULT_SETTINGS,
-  ExtensionSettings,
-  MainContextPromptBlock,
-  MainContextTemplatePreset,
-  MessageRole,
-  PromptSetting,
-  settingsManager,
-  SYSTEM_PROMPT_KEYS,
-  SystemPromptKey,
-} from '../settings.js';
+import { FC } from 'react';
+import { STButton } from 'sillytavern-utils-lib/components/react';
+import { settingsManager } from '../settings.js';
 import { useForceUpdate } from '../hooks/useForceUpdate.js';
 
-const globalContext = SillyTavern.getContext();
-
 export const CharacterCreatorSettings: FC = () => {
-  // --- State Management ---
   const forceUpdate = useForceUpdate();
   const settings = settingsManager.getSettings();
-  const [selectedSystemPrompt, setSelectedSystemPrompt] = useState<string>(SYSTEM_PROMPT_KEYS[0]);
 
-  const updateAndRefresh = useCallback(
-    (updater: (currentSettings: ExtensionSettings) => void) => {
-      const currentSettings = settingsManager.getSettings();
-      updater(currentSettings);
-      settingsManager.saveSettings();
-      forceUpdate();
-    },
-    [forceUpdate],
-  );
-
-  // --- Derived Data for UI (Memoized for performance) ---
-  const mainContextPresetItems = useMemo(
-    (): PresetItem[] => Object.keys(settings.mainContextTemplatePresets).map((key) => ({ value: key, label: key })),
-    [settings.mainContextTemplatePresets],
-  );
-
-  const systemPromptItems = useMemo(
-    (): PresetItem[] =>
-      Object.entries(settings.prompts).map(([key, prompt]) => ({
-        value: key,
-        label: `${prompt.label} (${key})`,
-      })),
-    [settings.prompts],
-  );
-
-  const mainContextListItems = useMemo((): SortableListItemData[] => {
-    const preset = settings.mainContextTemplatePresets[settings.mainContextTemplatePreset];
-    if (!preset) return [];
-    return preset.prompts.map((prompt) => {
-      const promptSetting = settings.prompts[prompt.promptName];
-      const label = promptSetting ? `${promptSetting.label} (${prompt.promptName})` : prompt.promptName;
-      return {
-        id: prompt.promptName,
-        label,
-        enabled: prompt.enabled,
-        selectValue: prompt.role,
-        selectOptions: [
-          { value: 'user', label: 'User' },
-          { value: 'assistant', label: 'Assistant' },
-          { value: 'system', label: 'System' },
-        ],
-      };
-    });
-  }, [settings.mainContextTemplatePreset, settings.mainContextTemplatePresets, settings.prompts]);
-
-  // --- Handlers for Main Context Template ---
-  const handleMainContextPresetChange = (newValue?: string) => {
-    updateAndRefresh((s) => {
-      s.mainContextTemplatePreset = newValue ?? 'default';
-    });
-  };
-
-  const handleMainContextPresetsChange = (newItems: PresetItem[]) => {
-    updateAndRefresh((s) => {
-      const newPresets: Record<string, MainContextTemplatePreset> = {};
-      newItems.forEach((item) => {
-        newPresets[item.value] =
-          s.mainContextTemplatePresets[item.value] ??
-          structuredClone(
-            s.mainContextTemplatePresets[s.mainContextTemplatePreset] ?? s.mainContextTemplatePresets['default'],
-          );
-      });
-      s.mainContextTemplatePresets = newPresets;
-    });
-  };
-
-  const handleMainContextListChange = (newListItems: SortableListItemData[]) => {
-    updateAndRefresh((s) => {
-      const newPrompts: MainContextPromptBlock[] = newListItems.map((item) => ({
-        promptName: item.id,
-        enabled: item.enabled,
-        role: (item.selectValue as MessageRole) ?? 'user',
-      }));
-
-      // Create a new preset object with the updated prompts
-      const updatedPreset = {
-        ...s.mainContextTemplatePresets[s.mainContextTemplatePreset],
-        prompts: newPrompts,
-      };
-
-      // Create a new presets object with the updated preset
-      const updatedPresets = {
-        ...s.mainContextTemplatePresets,
-        [s.mainContextTemplatePreset]: updatedPreset,
-      };
-
-      // Assign the new presets object back to the settings
-      s.mainContextTemplatePresets = updatedPresets;
-    });
-  };
-
-  const handleRestoreMainContextDefault = async () => {
-    const confirm = await globalContext.Popup.show.confirm('Restore default', 'Are you sure?');
-    if (!confirm) return;
-    updateAndRefresh((s) => {
-      // Create a new presets object with the restored default preset
-      s.mainContextTemplatePresets = {
-        ...s.mainContextTemplatePresets,
-        default: structuredClone(DEFAULT_SETTINGS.mainContextTemplatePresets['default']),
-      };
-
-      if (s.mainContextTemplatePreset === 'default') forceUpdate();
-      else s.mainContextTemplatePreset = 'default';
-    });
-  };
-
-  // --- Handlers for Prompt Templates ---
-  const handleSystemPromptsChange = (newItems: PresetItem[]) => {
-    updateAndRefresh((s) => {
-      const newKeys = newItems.map((item) => item.value);
-      const oldKeys = Object.keys(s.prompts);
-      const deletedKeys = oldKeys.filter((key) => !newKeys.includes(key));
-
-      deletedKeys.forEach((key) => {
-        Object.values(s.mainContextTemplatePresets).forEach((preset) => {
-          preset.prompts = preset.prompts.filter((p) => p.promptName !== key);
-        });
-      });
-
-      const newPrompts: Record<string, PromptSetting> = {};
-      newItems.forEach((item) => {
-        newPrompts[item.value] = s.prompts[item.value] ?? { content: '', isDefault: false, label: item.label };
-      });
-      // @ts-ignore
-      s.prompts = newPrompts;
-    });
-  };
-
-  const handleSystemPromptCreate = (value: string) => {
-    const variableName = convertToVariableName(value);
-    if (!variableName) {
-      st_echo('error', `Invalid prompt name: ${value}`);
-      return { confirmed: false };
+  const toggleSound = () => {
+    if (!settings.soundNotifications) {
+      settings.soundNotifications = { enabled: true, volume: 0.5 };
     }
-    if (settings.prompts[variableName]) {
-      st_echo('error', `Prompt name already exists: ${variableName}`);
-      return { confirmed: false };
-    }
-
-    updateAndRefresh((s) => {
-      // Create a new prompts object
-      s.prompts = {
-        ...s.prompts,
-        [variableName]: { content: s.prompts[selectedSystemPrompt]?.content ?? '', isDefault: false, label: value },
-      };
-
-      // Create a new mainContextTemplatePresets object
-      const newPresets = Object.fromEntries(
-        Object.entries(s.mainContextTemplatePresets).map(([presetName, preset]) => [
-          presetName,
-          {
-            ...preset,
-            prompts: [...preset.prompts, { enabled: true, promptName: variableName, role: 'user' }],
-          },
-        ]),
-      );
-      // @ts-ignore
-      s.mainContextTemplatePresets = newPresets;
-    });
-
-    setSelectedSystemPrompt(variableName);
-    return { confirmed: true, value: variableName };
+    settings.soundNotifications.enabled = !settings.soundNotifications.enabled;
+    settingsManager.saveSettings();
+    forceUpdate();
   };
 
-  const handleSystemPromptRename = (oldValue: string, newValue: string) => {
-    const variableName = convertToVariableName(newValue);
-    if (!variableName) {
-      st_echo('error', `Invalid prompt name: ${newValue}`);
-      return { confirmed: false };
+  const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!settings.soundNotifications) {
+      settings.soundNotifications = { enabled: true, volume: 0.5 };
     }
-    if (settings.prompts[variableName]) {
-      st_echo('error', `Prompt name already exists: ${variableName}`);
-      return { confirmed: false };
-    }
-
-    updateAndRefresh((s) => {
-      // Create new prompts object
-      const { [oldValue]: renamedPrompt, ...restPrompts } = s.prompts;
-      // @ts-ignore
-      s.prompts = {
-        ...restPrompts,
-        [variableName]: { ...renamedPrompt, label: newValue },
-      };
-
-      // Create new mainContextTemplatePresets object
-      const newPresets = Object.fromEntries(
-        Object.entries(s.mainContextTemplatePresets).map(([presetName, preset]) => [
-          presetName,
-          {
-            ...preset,
-            prompts: preset.prompts.map((p) => (p.promptName === oldValue ? { ...p, promptName: variableName } : p)),
-          },
-        ]),
-      );
-      s.mainContextTemplatePresets = newPresets;
-    });
-
-    setSelectedSystemPrompt(variableName);
-    return { confirmed: true, value: variableName };
+    settings.soundNotifications.volume = parseFloat(e.target.value);
+    settingsManager.saveSettings();
+    forceUpdate();
   };
 
-  const handleSystemPromptContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const newContent = e.target.value;
-    updateAndRefresh((s) => {
-      const prompt = s.prompts[selectedSystemPrompt];
-      if (prompt) {
-        // Create a new prompts object
-        s.prompts = {
-          ...s.prompts,
-          [selectedSystemPrompt]: {
-            ...prompt, // Copy existing properties
-            content: newContent,
-            isDefault: SYSTEM_PROMPT_KEYS.includes(selectedSystemPrompt as SystemPromptKey)
-              ? DEFAULT_PROMPT_CONTENTS[selectedSystemPrompt as SystemPromptKey] === newContent
-              : false,
-          },
-        };
-      }
-    });
+  const playTestSound = (type: 'success' | 'error') => {
+    const volume = settings.soundNotifications?.volume ?? 0.5;
+    const audio = new Audio(`scripts/extensions/third-party/SillyTavern-Character-Creator/templates/${type}.wav`);
+    audio.volume = volume;
+    audio.play().catch(e => console.error('Failed to play test sound:', e));
   };
-
-  const handleRestoreSystemPromptDefault = async () => {
-    const prompt = settings.prompts[selectedSystemPrompt];
-    if (!prompt) return st_echo('warning', 'No prompt selected.');
-    const confirm = await globalContext.Popup.show.confirm('Restore Default', `Restore default for "${prompt.label}"?`);
-    if (confirm) {
-      updateAndRefresh((s) => {
-        // Create a new prompts object with the restored content for the selected prompt
-        s.prompts = {
-          ...s.prompts,
-          [selectedSystemPrompt]: {
-            ...s.prompts[selectedSystemPrompt],
-            content: DEFAULT_PROMPT_CONTENTS[selectedSystemPrompt as SystemPromptKey],
-          },
-        };
-      });
-    }
-  };
-
-  // --- Other Settings & Reset ---
-  const handleResetEverything = async () => {
-    const confirm = await globalContext.Popup.show.confirm('Reset Everything', 'Are you sure? This cannot be undone.');
-    if (confirm) {
-      settingsManager.resetSettings();
-      forceUpdate();
-      st_echo('success', 'Settings have been reset.');
-    }
-  };
-
-  const selectedPrompt = settings.prompts[selectedSystemPrompt];
-  const isDefaultSystemPromptSelected = SYSTEM_PROMPT_KEYS.includes(selectedSystemPrompt as SystemPromptKey);
 
   return (
-    <div className="charCreator_settings">
-      <div style={{ marginTop: '10px' }}>
-        <div className="title_restorable">
-          <span>Main Context Template</span>
-          <STButton
-            className="fa-solid fa-undo"
-            title="Restore main context template to default"
-            onClick={handleRestoreMainContextDefault}
-          />
-        </div>
-        <STPresetSelect
-          label="Template"
-          items={mainContextPresetItems}
-          value={settings.mainContextTemplatePreset}
-          readOnlyValues={['default']}
-          onChange={handleMainContextPresetChange}
-          onItemsChange={handleMainContextPresetsChange}
-          enableCreate
-          enableRename
-          enableDelete
-        />
-        <div style={{ marginTop: '5px' }}>
-          <STSortableList
-            items={mainContextListItems}
-            onItemsChange={handleMainContextListChange}
-            showSelectInput
-            showToggleButton
-          />
-        </div>
-      </div>
+    <div className="settings-container">
+      <h3>Extension Settings</h3>
 
-      <hr style={{ margin: '10px 0' }} />
-
-      <div style={{ marginTop: '10px' }}>
-        <div className="title_restorable">
-          <span>Prompt Templates</span>
-          {isDefaultSystemPromptSelected && (
-            <STButton
-              className="fa-solid fa-undo"
-              title="Restore selected prompt to default"
-              onClick={handleRestoreSystemPromptDefault}
-            />
-          )}
-        </div>
-        <STPresetSelect
-          label="Prompt"
-          items={systemPromptItems}
-          value={selectedSystemPrompt}
-          readOnlyValues={SYSTEM_PROMPT_KEYS}
-          onChange={(newValue) => setSelectedSystemPrompt(newValue ?? '')}
-          onItemsChange={handleSystemPromptsChange}
-          onCreate={handleSystemPromptCreate}
-          onRename={handleSystemPromptRename}
-          enableCreate
-          enableRename
-          enableDelete
-        />
-        <STTextarea
-          value={selectedPrompt?.content ?? ''}
-          onChange={handleSystemPromptContentChange}
-          placeholder="Edit the selected prompt template here..."
-          rows={6}
-          style={{ marginTop: '5px', width: '100%' }}
-        />
-      </div>
-
-      <hr style={{ margin: '15px 0' }} />
-
-      <label className="checkbox_label" style={{ marginTop: '15px' }}>
-        <input
-          type="checkbox"
-          checked={settings.showSaveAsWorldInfoEntry.show}
-          onChange={(e) =>
-            updateAndRefresh((s) => {
-              s.showSaveAsWorldInfoEntry.show = e.target.checked;
-            })
-          }
-        />
-        Show "Save as World Info Entry" option in popup
-      </label>
-
-      <hr style={{ margin: '15px 0' }} />
-
-      <div className="card" style={{ padding: '15px' }}>
-        <h3>Sound Notifications</h3>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-          <label className="checkbox_label">
-            <input
-              type="checkbox"
-              checked={settings.soundNotifications?.enabled ?? true}
-              onChange={(e) =>
-                updateAndRefresh((s) => {
-                  if (!s.soundNotifications) s.soundNotifications = { enabled: true, volume: 0.5 };
-                  s.soundNotifications.enabled = e.target.checked;
-                })
-              }
-            />
-            Enable Sounds (Success/Error)
-          </label>
-
+      <div className="settings-section card">
+        <h4><i className="fa-solid fa-volume-high"></i> Sound Notifications</h4>
+        <div className="settings-row" style={{ display: 'flex', alignItems: 'center', gap: '20px', margin: '15px 0' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <i className="fa-solid fa-volume-high" />
+            <STButton
+              onClick={toggleSound}
+              className={settings.soundNotifications?.enabled ? 'confirm' : 'secondary'}
+            >
+              <i className={`fa-solid ${settings.soundNotifications?.enabled ? 'fa-bell' : 'fa-bell-slash'}`}></i>
+              {settings.soundNotifications?.enabled ? ' Enabled' : ' Disabled'}
+            </STButton>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexGrow: 1 }}>
+            <label>Volume:</label>
             <input
               type="range"
               min="0"
               max="1"
-              step="0.01"
-              style={{ flex: 1 }}
+              step="0.05"
               value={settings.soundNotifications?.volume ?? 0.5}
-              onChange={(e) =>
-                updateAndRefresh((s) => {
-                  if (!s.soundNotifications) s.soundNotifications = { enabled: true, volume: 0.5 };
-                  s.soundNotifications.volume = parseFloat(e.target.value);
-                })
-              }
+              onChange={handleVolumeChange}
+              style={{ flexGrow: 1 }}
             />
             <span style={{ minWidth: '40px', textAlign: 'right', fontFamily: 'monospace' }}>
               {Math.round((settings.soundNotifications?.volume ?? 0.5) * 100)}%
             </span>
           </div>
-
-          <div style={{ display: 'flex', gap: '10px' }}>
-            <STButton
-              style={{ flex: 1 }}
-              onClick={() => {
-                const audio = new Audio('scripts/extensions/third-party/SillyTavern-Character-Creator/templates/success.wav');
-                audio.volume = settings.soundNotifications?.volume ?? 0.5;
-                audio.play();
-              }}
-            >
-              Test Success Sound
-            </STButton>
-            <STButton
-              style={{ flex: 1 }}
-              onClick={() => {
-                const audio = new Audio('scripts/extensions/third-party/SillyTavern-Character-Creator/templates/alert.wav');
-                audio.volume = settings.soundNotifications?.volume ?? 0.5;
-                audio.play();
-              }}
-            >
-              Test Error Sound
-            </STButton>
-          </div>
         </div>
+
+        <div className="settings-row test-buttons" style={{ display: 'flex', gap: '10px' }}>
+          <STButton onClick={() => playTestSound('success')} className="small">
+            <i className="fa-solid fa-play"></i> Test Success
+          </STButton>
+          <STButton onClick={() => playTestSound('error')} className="small">
+            <i className="fa-solid fa-play"></i> Test Error
+          </STButton>
+        </div>
+
+        <p className="help-text" style={{ marginTop: '10px', opacity: 0.6, fontSize: '0.9em' }}>
+          Sounds will play when AI finishes generating a response or when an error occurs.
+        </p>
       </div>
 
-      <hr style={{ margin: '15px 0' }} />
-
-      <div style={{ textAlign: 'center', marginTop: '15px' }}>
-        <STButton className="danger_button" style={{ width: 'auto' }} onClick={handleResetEverything}>
-          <i style={{ marginRight: '10px' }} className="fa-solid fa-triangle-exclamation" />I messed up, reset
-          everything
-        </STButton>
+      <div className="settings-section card" style={{ marginTop: '20px' }}>
+        <h4><i className="fa-solid fa-info-circle"></i> About</h4>
+        <p>Character Creator Extension v0.3.0</p>
+        <p style={{ opacity: 0.7 }}>A powerful tool for generating and refining SillyTavern characters with AI assistance.</p>
       </div>
     </div>
   );

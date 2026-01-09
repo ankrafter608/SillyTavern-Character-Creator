@@ -110,6 +110,14 @@ export const MainPopup: FC = () => {
   const [loadedCharacter, setLoadedCharacter] = useState<Character | null>(null);
   const [compareData, setCompareData] = useState<{ original: string; current: string; fieldName: string } | null>(null);
 
+  // Auto-scroll to top when switching modes
+  useEffect(() => {
+    const popup = document.getElementById('charCreatorPopup');
+    if (popup && popup.parentElement) {
+      popup.parentElement.scrollTo({ top: 0, behavior: 'auto' });
+    }
+  }, [creatorMode]);
+
   // --- Revise Session State ---
   const [reviseSessionManagerOpen, setReviseSessionManagerOpen] = useState(false);
   const [reviseSessionTarget, setReviseSessionTarget] = useState<{

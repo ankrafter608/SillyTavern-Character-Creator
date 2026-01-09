@@ -17,7 +17,6 @@ interface ChatInterfaceProps {
     additionalInstructions?: string;
 }
 
-/*
 const playNotificationSound = (type: 'success' | 'error') => {
     const settings = settingsManager.getSettings().soundNotifications;
     if (!settings?.enabled) return;
@@ -26,7 +25,6 @@ const playNotificationSound = (type: 'success' | 'error') => {
     audio.volume = settings.volume ?? 0.5;
     audio.play().catch(e => console.error('Failed to play sound:', e));
 };
-*/
 
 export const ChatInterface: FC<ChatInterfaceProps> = ({
     session,
@@ -76,7 +74,7 @@ export const ChatInterface: FC<ChatInterfaceProps> = ({
 
             onMessagesChange([...newMessages, aiMessage]);
             onSessionUpdate(updatedSession);
-            // playNotificationSound('success');
+            playNotificationSound('success');
         } catch (error: any) {
             console.error('Chat error:', error);
             st_echo('error', `Chat error: ${error.message || String(error)}`);
@@ -88,7 +86,7 @@ export const ChatInterface: FC<ChatInterfaceProps> = ({
                 isError: true,
             };
             onMessagesChange([...newMessages, errorMessage]);
-            // playNotificationSound('error');
+            playNotificationSound('error');
         } finally {
             setIsProcessing(false);
         }

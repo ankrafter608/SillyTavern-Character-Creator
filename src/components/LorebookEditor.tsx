@@ -242,6 +242,9 @@ export const LorebookEditor: FC<LorebookEditorProps> = ({
                                     >
                                         <i className="fa-solid fa-trash"></i>
                                     </STButton>
+                                    <div style={{ marginLeft: '10px', minWidth: '80px' }}>
+                                        <LorebookTokenCounter content={activeEntry.content} />
+                                    </div>
                                 </div>
                             </div>
 
@@ -291,7 +294,6 @@ export const LorebookEditor: FC<LorebookEditorProps> = ({
                                         rows={8}
                                         placeholder="The lore content that will be injected when keys are triggered..."
                                     />
-                                    <LorebookTokenCounter content={activeEntry.content} />
                                 </label>
 
                                 <div className="entry-options">
@@ -382,11 +384,10 @@ const LorebookTokenCounter: FC<{ content: string }> = ({ content }) => {
     const { tokens, isCalculating } = useTokenCount(content);
     return (
         <div className="token-counter" style={{
-            fontSize: '0.8em',
+            fontSize: 'var(--font-size-small, 0.8em)',
             opacity: 0.5,
-            marginTop: '4px',
-            textAlign: 'right',
-            fontFamily: 'monospace'
+            fontFamily: 'var(--font-family-mono, monospace)',
+            whiteSpace: 'nowrap'
         }}>
             {isCalculating ? (
                 <i className="fa-solid fa-spinner fa-spin"></i>

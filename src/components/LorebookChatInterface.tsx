@@ -2,6 +2,7 @@ import { FC, useState, useCallback, useRef, useEffect } from 'react';
 import { STButton, STTextarea } from 'sillytavern-utils-lib/components/react';
 import { LorebookData, LorebookEntry } from './LorebookEditor.js';
 import { KBFile } from './KnowledgeBase.js';
+import { settingsManager } from '../settings.js';
 
 interface ChatMessage {
     role: 'user' | 'assistant';
@@ -23,6 +24,15 @@ interface LorebookChatInterfaceProps {
 }
 
 const globalContext = SillyTavern.getContext();
+
+const playNotificationSound = (type: 'success' | 'error') => {
+    const settings = settingsManager.getSettings().soundNotifications;
+    if (!settings?.enabled) return;
+
+    const audio = new Audio(`scripts/extensions/third-party/SillyTavern-Character-Creator/templates/${type}.wav`);
+    audio.volume = settings.volume ?? 0.5;
+    audio.play().catch(e => console.error('Failed to play sound:', e));
+};
 
 const LOREBOOK_CHAT_PROMPT = `You are an AI assistant specialized in creating World Info / Lorebook entries for roleplay AI systems.
 
@@ -222,6 +232,7 @@ export const LorebookChatInterface: FC<LorebookChatInterfaceProps> = ({
             };
 
             onMessagesChange([...newMessages, aiMessage]);
+            playNotificationSound('success');
         } catch (error: any) {
             console.error('Lorebook chat error:', error);
             const errorMessage: ChatMessage = {
@@ -231,6 +242,7 @@ export const LorebookChatInterface: FC<LorebookChatInterfaceProps> = ({
                 isError: true,
             };
             onMessagesChange([...newMessages, errorMessage]);
+            playNotificationSound('error');
         } finally {
             setIsLoading(false);
         }
