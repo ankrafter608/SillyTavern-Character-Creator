@@ -3,12 +3,14 @@ import { STButton, STTextarea } from 'sillytavern-utils-lib/components/react';
 import { st_echo } from 'sillytavern-utils-lib/config';
 import { Session } from '../generate.js';
 import { sendChatMessage, ChatMessage } from '../autonomous-generator.js';
+import { KBFile } from './KnowledgeBase.js';
 
 interface ChatInterfaceProps {
     session: Session;
     onSessionUpdate: (session: Session) => void;
     profileId: string;
     maxResponseToken?: number;
+    kbFiles?: KBFile[];
 }
 
 export const ChatInterface: FC<ChatInterfaceProps> = ({
@@ -16,6 +18,7 @@ export const ChatInterface: FC<ChatInterfaceProps> = ({
     onSessionUpdate,
     profileId,
     maxResponseToken,
+    kbFiles,
 }) => {
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [input, setInput] = useState('');
@@ -49,6 +52,7 @@ export const ChatInterface: FC<ChatInterfaceProps> = ({
                 session,
                 profileId,
                 maxResponseToken,
+                kbFiles,
             });
 
             setMessages((prev) => [...prev, aiMessage]);

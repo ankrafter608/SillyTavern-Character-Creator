@@ -1,4 +1,4 @@
-import { FC, useState, useCallback } from 'react';
+import { FC, useState, useCallback, useEffect } from 'react';
 import { STButton, STTextarea } from 'sillytavern-utils-lib/components/react';
 
 export interface LorebookEntry {
@@ -49,9 +49,18 @@ export const LorebookEditor: FC<LorebookEditorProps> = ({
     isGenerating,
     onGenerateEntry,
 }) => {
-    const [activeEntryId, setActiveEntryId] = useState<string | null>(
-        lorebook.entries.length > 0 ? lorebook.entries[0].id : null
-    );
+    const [activeEntryId, setActiveEntryId] = useState<string | null>(null);
+
+    // Sync active entry if it's null or invalid
+    useEffect(() => {
+        if (lorebook.entries.length > 0) {
+            if (!activeEntryId || !lorebook.entries.find(e => e.id === activeEntryId)) {
+                setActiveEntryId(lorebook.entries[0].id);
+            }
+        } else {
+            setActiveEntryId(null);
+        }
+    }, [lorebook.entries, activeEntryId]);
 
     const handleAddEntry = useCallback(() => {
         const newEntry = createEmptyEntry();

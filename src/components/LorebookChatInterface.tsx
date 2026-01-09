@@ -1,6 +1,7 @@
 import { FC, useState, useCallback } from 'react';
 import { STButton, STTextarea } from 'sillytavern-utils-lib/components/react';
 import { LorebookData, LorebookEntry } from './LorebookEditor.js';
+import { KBFile } from './KnowledgeBase.js';
 
 interface ChatMessage {
     role: 'user' | 'assistant';
@@ -14,6 +15,7 @@ interface LorebookChatInterfaceProps {
     onLorebookChange: (lorebook: LorebookData) => void;
     profileId: string;
     maxResponseToken?: number;
+    kbFiles?: KBFile[];
 }
 
 const globalContext = SillyTavern.getContext();
@@ -21,6 +23,12 @@ const globalContext = SillyTavern.getContext();
 const LOREBOOK_CHAT_PROMPT = `You are an AI assistant specialized in creating World Info / Lorebook entries for roleplay AI systems.
 
 Current Lorebook: "{{lorebookName}}"
+
+{{#if kbContent}}
+REFERENCE MATERIALS (Use this information for accuracy):
+{{kbContent}}
+{{/if}}
+
 Current Entries:
 {{currentEntriesJson}}
 
@@ -72,6 +80,7 @@ export const LorebookChatInterface: FC<LorebookChatInterfaceProps> = ({
     onLorebookChange,
     profileId,
     maxResponseToken = 3072,
+    kbFiles = [],
 }) => {
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [input, setInput] = useState('');
@@ -93,6 +102,13 @@ export const LorebookChatInterface: FC<LorebookChatInterfaceProps> = ({
         try {
             const Handlebars = await import('handlebars');
 
+            // Build KB content
+            const activeKbFiles = kbFiles.filter(f => f.enabled);
+            let kbContent = '';
+            if (activeKbFiles.length > 0) {
+                kbContent = activeKbFiles.map(f => `--- FILE: ${f.name} ---\n${f.content}\n--- END FILE ---`).join('\n\n');
+            }
+
             // Build current entries JSON
             const currentEntriesJson = lorebook.entries.length > 0
                 ? JSON.stringify(lorebook.entries.map(e => ({
@@ -109,6 +125,7 @@ export const LorebookChatInterface: FC<LorebookChatInterfaceProps> = ({
                 lorebookName: lorebook.name,
                 currentEntriesJson,
                 userMessage: input.trim(),
+                kbContent,
             });
 
             const response = await globalContext.ConnectionManagerRequestService.sendRequest(

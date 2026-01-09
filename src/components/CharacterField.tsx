@@ -45,7 +45,7 @@ export const CharacterField: FC<CharacterFieldProps> = ({
       <label>{label}</label>
       <div className={`field-container ${large ? 'large-field' : ''}`}>
         <STTextarea value={value} onChange={(e) => onValueChange(fieldId, e.target.value)} rows={rows} />
-        <div style={{ display: 'flex', flexDirection: 'column' }}>
+        <div className="field-actions">
           <STButton onClick={() => onGenerate(fieldId)} disabled={isGenerating} title="Generate field content">
             {isGenerating ? (
               <i className="fa-solid fa-spinner fa-spin"></i>

@@ -27,6 +27,7 @@ import { ReviseSessionManager } from './ReviseSessionManager.js';
 import { ChatInterface } from './ChatInterface.js';
 import { LorebookEditor, LorebookData, createEmptyLorebook } from './LorebookEditor.js';
 import { LorebookChatInterface } from './LorebookChatInterface.js';
+import { KnowledgeBase, KBFile } from './KnowledgeBase.js';
 // import { generateFullCharacter, applyCharacterToSession } from '../autonomous-generator.js';
 import { exportCharacterAsJSON, exportLorebookAsJSON } from '../character-exporter.js';
 
@@ -94,6 +95,7 @@ export const MainPopup: FC = () => {
   const [activeTab, setActiveTab] = useState<'core' | 'draft'>('core');
   const [creatorMode, setCreatorMode] = useState<'character' | 'lorebook'>('character');
   const [lorebook, setLorebook] = useState<LorebookData>(createEmptyLorebook());
+  const [kbFiles, setKbFiles] = useState<KBFile[]>([]);
 
   const [allCharacters, setAllCharacters] = useState<Character[]>([]);
   const [allWorldNames, setAllWorldNames] = useState<string[]>([]);
@@ -590,6 +592,8 @@ export const MainPopup: FC = () => {
               />
             </div>
 
+            <KnowledgeBase files={kbFiles} onFilesChange={setKbFiles} />
+
             <div className="card">
               <h3>Context to Send</h3>
               <div className="context-options">
@@ -973,6 +977,7 @@ export const MainPopup: FC = () => {
               onSessionUpdate={setSession}
               profileId={settings.profileId}
               maxResponseToken={settings.maxResponseToken}
+              kbFiles={kbFiles}
             />
           </div>
         </div>
@@ -981,7 +986,8 @@ export const MainPopup: FC = () => {
       {/* LOREBOOK MODE */}
       {creatorMode === 'lorebook' && (
         <div className="container">
-          <div className="column-left" style={{ width: '60%' }}>
+          <div className="column-left" style={{ width: '60%', display: 'flex', flexDirection: 'column', gap: '15px' }}>
+            <KnowledgeBase files={kbFiles} onFilesChange={setKbFiles} />
             <LorebookEditor
               lorebook={lorebook}
               onLorebookChange={setLorebook}
@@ -993,6 +999,7 @@ export const MainPopup: FC = () => {
               onLorebookChange={setLorebook}
               profileId={settings.profileId}
               maxResponseToken={settings.maxResponseToken}
+              kbFiles={kbFiles}
             />
           </div>
         </div>

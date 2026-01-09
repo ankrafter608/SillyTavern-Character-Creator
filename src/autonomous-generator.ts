@@ -107,6 +107,11 @@ const CHAT_REFINEMENT_PROMPT = `You are an AI assistant helping to refine a char
 Current character state:
 {{currentCharacterJson}}
 
+{{#if kbContent}}
+REFERENCE MATERIALS (Use this information for accuracy):
+{{kbContent}}
+{{/if}}
+
 User's request: {{userMessage}}
 
 Analyze the request and:
@@ -265,14 +270,23 @@ export async function sendChatMessage({
     session,
     profileId,
     maxResponseToken = 3072, // Increased default
+    kbFiles = [],
 }: {
     messages: ChatMessage[];
     session: Session;
     profileId: string;
     maxResponseToken?: number;
+    kbFiles?: { name: string; content: string; enabled: boolean }[];
 }): Promise<{ aiMessage: ChatMessage; updatedSession: Session }> {
     try {
         const Handlebars = await import('handlebars');
+
+        // Build KB content
+        const activeKbFiles = kbFiles.filter(f => f.enabled);
+        let kbContent = '';
+        if (activeKbFiles.length > 0) {
+            kbContent = activeKbFiles.map(f => `--- FILE: ${f.name} ---\n${f.content}\n--- END FILE ---`).join('\n\n');
+        }
 
         // Build current character JSON
         const currentCharacter: Partial<CharacterData> = {};
@@ -300,6 +314,7 @@ export async function sendChatMessage({
         const fullPrompt = template({
             currentCharacterJson: JSON.stringify(currentCharacter, null, 2),
             userMessage,
+            kbContent,
         });
 
         const response = await globalContext.ConnectionManagerRequestService.sendRequest(

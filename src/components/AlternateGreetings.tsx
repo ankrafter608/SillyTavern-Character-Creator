@@ -102,7 +102,7 @@ export const AlternateGreetings: FC<AlternateGreetingsProps> = ({
               />
             </div>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
+          <div className="field-actions">
             <STButton onClick={() => onGenerate(activeTabIndex)} disabled={isGenerating} title="Generate greeting">
               {isGenerating ? (
                 <i className="fa-solid fa-spinner fa-spin"></i>
