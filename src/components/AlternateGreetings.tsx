@@ -1,5 +1,6 @@
 import { FC, useState, useEffect } from 'react';
 import { STButton, STTextarea } from 'sillytavern-utils-lib/components/react';
+import { useTokenCount } from '../hooks/useTokenCount.js';
 
 const globalContext = SillyTavern.getContext();
 
@@ -26,6 +27,8 @@ export const AlternateGreetings: FC<AlternateGreetingsProps> = ({
   isGenerating,
 }) => {
   const [activeTabIndex, setActiveTabIndex] = useState(0);
+  const activeGreeting = greetings[activeTabIndex];
+  const { tokens, isCalculating } = useTokenCount(activeGreeting?.value ?? '');
 
   useEffect(() => {
     // Reset to the first tab if the active tab becomes invalid (e.g., after deletion)
@@ -56,8 +59,6 @@ export const AlternateGreetings: FC<AlternateGreetingsProps> = ({
     newGreetings[index][field] = newContent;
     onGreetingsChange(newGreetings);
   };
-
-  const activeGreeting = greetings[activeTabIndex];
 
   return (
     <div className="character-field alternate-greetings-field">
@@ -131,6 +132,19 @@ export const AlternateGreetings: FC<AlternateGreetingsProps> = ({
             >
               <i className="fa-solid fa-trash-can"></i>
             </STButton>
+            <div className="token-counter" style={{
+              fontSize: '0.8em',
+              opacity: 0.5,
+              marginLeft: 'auto',
+              alignSelf: 'center',
+              fontFamily: 'monospace'
+            }}>
+              {isCalculating ? (
+                <i className="fa-solid fa-spinner fa-spin"></i>
+              ) : (
+                <>{tokens !== null ? `${tokens} tokens` : ''}</>
+              )}
+            </div>
           </div>
         </div>
       )}

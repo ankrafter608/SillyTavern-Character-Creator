@@ -38,16 +38,21 @@ export interface LorebookEntry {
 }
 
 export interface Lorebook {
-    name?: string;
-    description?: string;
-    scan_depth?: number;
-    token_budget?: number;
-    recursive_scanning?: boolean;
+    name: string;
+    description: string;
+    scan_depth: number;
+    token_budget: number;
+    recursive_scanning: boolean;
     extensions: Record<string, any>;
-    entries: LorebookEntry[];
+    entries: any[];
 }
 
 const AUTONOMOUS_GENERATION_PROMPT = `You are an expert character creator for roleplay AI. Based on the user's description, create a complete, detailed character card.
+
+{{#if additionalInstructions}}
+IMPORTANT RULES & STYLE GUIDELINES (Follow these strictly):
+{{additionalInstructions}}
+{{/if}}
 
 User's request: {{userPrompt}}
 
@@ -63,7 +68,13 @@ Generate a complete character with ALL of the following fields filled in detail:
 4. **scenario** - The setting and context for interaction (1-2 paragraphs describing where and when the interaction takes place, the relationship with {{user}}, and the current situation)
 5. **first_mes** - Opening message from the character (2-4 sentences with action and dialogue that sets the scene and shows personality)
 6. **mes_example** - 3-4 example dialogue exchanges showing character's voice and style (use {{user}}: and {{char}}: format, include actions in asterisks)
-7. **alternate_greetings** - Array of 2-3 alternative opening messages (each should be different scenarios or moods)
+7. **alternate_greetings** - Array of 3-5 alternative opening messages (each should be a completely different scenario, mood, or context than the first_mes. MUST be a simple array of strings).
+
+IMPORTANT: Do NOT include the primary greeting (first_mes) in the alternate_greetings array. They are separate fields.
+  
+Example:
+"first_mes": "Hello!",
+"alternate_greetings": ["Hey there.", "Greetings, traveler.", "What do you want?"]
 
 {{#if includeLorebook}}
 8. **lorebook** - Object with entries array, each entry having:
@@ -113,6 +124,11 @@ REFERENCE MATERIALS (Use this information for accuracy):
 {{kbContent}}
 {{/if}}
 
+{{#if additionalInstructions}}
+SPECIAL INSTRUCTIONS & GUIDELINES (Priority: HIGH):
+{{additionalInstructions}}
+{{/if}}
+
 User's request: {{userMessage}}
 
 Analyze the request and:
@@ -131,19 +147,20 @@ Available fields to update:
 
 Return a JSON object with:
 - "response": Your friendly explanation of what you changed (2-3 sentences)
-- "updatedFields": Object with only the fields that changed. NOTE: alternate_greetings MUST be an array of strings!
+- "updatedFields": Object with only the fields that changed. 
 - "fieldsUpdated": Array of field names that were modified (for UI display)
+
+IMPORTANT: \`alternate_greetings\` is a SEPARATE array. Do NOT put alternative greetings into the \`first_mes\` field. \`first_mes\` is only for the primary greeting. If the user asks for multiple greetings, put the first one in \`first_mes\` and the rest in \`alternate_greetings\`.
 
 Example with alternate greetings:
 \`\`\`json
 {
-  "response": "I've added three alternative greetings showing different moods.",
+  "response": "I've set the primary greeting and added two more unique alternatives in the Alternate Greetings section.",
   "updatedFields": {
-    "first_mes": "*She looks up from her book* Oh, hello there!",
+    "first_mes": "*Primary greeting content*",
     "alternate_greetings": [
-      "*Waves excitedly* Hey! I was hoping you'd come by!",
-      "*Sighs dramatically* Finally, some company...",
-      "*Smiles warmly* Welcome, friend. Make yourself at home."
+      "*Alternative greeting 1*",
+      "*Alternative greeting 2*"
     ]
   },
   "fieldsUpdated": ["first_mes", "alternate_greetings"]
@@ -159,11 +176,12 @@ export async function generateFullCharacter(
     prompt: string,
     includeLorebook: boolean,
     profileId: string,
+    additionalInstructions?: string,
 ): Promise<{ character: CharacterData; lorebook?: Lorebook }> {
     try {
         const Handlebars = await import('handlebars');
         const template = Handlebars.compile(AUTONOMOUS_GENERATION_PROMPT);
-        const fullPrompt = template({ userPrompt: prompt, includeLorebook });
+        const fullPrompt = template({ userPrompt: prompt, includeLorebook, additionalInstructions });
 
         const response = await globalContext.ConnectionManagerRequestService.sendRequest(
             profileId,
@@ -229,7 +247,12 @@ export async function generateFullCharacter(
  * Apply generated character data to session
  */
 export function applyCharacterToSession(character: CharacterData, session: Session): Session {
-    const newSession = { ...session };
+    // Deep copy session and its fields to ensure React triggers re-renders
+    const newSession = {
+        ...session,
+        fields: { ...session.fields },
+        draftFields: { ...session.draftFields }
+    };
 
     // Update core fields
     CHARACTER_FIELDS.forEach((field) => {
@@ -272,12 +295,14 @@ export async function sendChatMessage({
     profileId,
     maxResponseToken = 3072, // Increased default
     kbFiles = [],
+    additionalInstructions,
 }: {
     messages: ChatMessage[];
     session: Session;
     profileId: string;
     maxResponseToken?: number;
     kbFiles?: { name: string; content: string; enabled: boolean }[];
+    additionalInstructions?: string;
 }): Promise<{ aiMessage: ChatMessage; updatedSession: Session }> {
     try {
         const Handlebars = await import('handlebars');
@@ -316,6 +341,7 @@ export async function sendChatMessage({
             currentCharacterJson: JSON.stringify(currentCharacter, null, 2),
             userMessage,
             kbContent,
+            additionalInstructions,
         });
 
         const response = await globalContext.ConnectionManagerRequestService.sendRequest(
@@ -373,32 +399,49 @@ export async function sendChatMessage({
         }
 
         // Apply updates to session
-        let updatedSession = { ...session };
+        // Deep copy the fields object to ensure React triggers a re-render of components 
+        // that depend on the session.fields reference (like useMemo in MainPopup)
+        let updatedSession = {
+            ...session,
+            fields: { ...session.fields },
+            draftFields: { ...session.draftFields }
+        };
+
         if (data.updatedFields) {
             Object.keys(data.updatedFields).forEach((field) => {
                 if (field === 'alternate_greetings') {
-                    // Clear existing alternate greetings
+                    // Clear existing alternate greetings from the NEW fields object
                     Object.keys(updatedSession.fields).forEach((key) => {
                         if (key.startsWith('alternate_greetings_')) {
                             delete updatedSession.fields[key];
                         }
                     });
                     // Add new alternate greetings
-                    const greetings = data.updatedFields[field] as string[];
-                    greetings.forEach((greeting, index) => {
-                        const fieldName = `alternate_greetings_${index + 1}`;
-                        updatedSession.fields[fieldName] = {
-                            value: greeting,
+                    const greetings = data.updatedFields[field];
+                    if (Array.isArray(greetings)) {
+                        greetings.forEach((greeting, index) => {
+                            const fieldName = `alternate_greetings_${index + 1}`;
+                            updatedSession.fields[fieldName] = {
+                                value: String(greeting),
+                                prompt: '',
+                                label: `Alternate Greeting ${index + 1}`,
+                            };
+                        });
+                    }
+                } else if (CHARACTER_FIELDS.includes(field as any) || updatedSession.draftFields[field]) {
+                    // Update core fields or draft fields
+                    if (CHARACTER_FIELDS.includes(field as any)) {
+                        updatedSession.fields[field] = {
+                            value: String(data.updatedFields[field]),
                             prompt: '',
-                            label: `Alternate Greeting ${index + 1}`,
+                            label: CHARACTER_LABELS[field as keyof typeof CHARACTER_LABELS],
                         };
-                    });
-                } else if (CHARACTER_FIELDS.includes(field as any)) {
-                    updatedSession.fields[field] = {
-                        value: data.updatedFields[field],
-                        prompt: '',
-                        label: CHARACTER_LABELS[field as keyof typeof CHARACTER_LABELS],
-                    };
+                    } else if (updatedSession.draftFields[field]) {
+                        updatedSession.draftFields[field] = {
+                            ...updatedSession.draftFields[field],
+                            value: String(data.updatedFields[field]),
+                        };
+                    }
                 }
             });
         }

@@ -472,3 +472,28 @@
         }
     }
 }
+
+.autonomous-mode {
+    &.chat-only {
+        .autonomous-content {
+            display: flex;
+            justify-content: center;
+            min-height: 650px;
+
+            .autonomous-chat-full {
+                width: 100%;
+                max-width: 900px;
+                display: flex;
+                flex-direction: column;
+                background: rgba(255, 255, 255, 0.02);
+                border: 1px solid rgba(255, 255, 255, 0.05);
+                border-radius: var(--radius-lg);
+                padding: 10px;
+
+                .chat-interface {
+                    height: 650px;
+                }
+            }
+        }
+    }
+}

@@ -28,8 +28,8 @@ import { ChatInterface } from './ChatInterface.js';
 import { LorebookEditor, LorebookData, createEmptyLorebook } from './LorebookEditor.js';
 import { LorebookChatInterface } from './LorebookChatInterface.js';
 import { KnowledgeBase, KBFile } from './KnowledgeBase.js';
-import { ChatMessage } from '../autonomous-generator.js';
-// import { generateFullCharacter, applyCharacterToSession } from '../autonomous-generator.js';
+import { ChatMessage, generateFullCharacter, applyCharacterToSession } from '../autonomous-generator.js';
+import { AutonomousMode } from './AutonomousMode.js';
 import { exportCharacterAsJSON, exportLorebookAsJSON } from '../character-exporter.js';
 
 if (!Handlebars.helpers['join']) {
@@ -94,9 +94,10 @@ export const MainPopup: FC = () => {
   const [isGenerating, setIsGenerating] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'core' | 'draft'>('core');
-  const [creatorMode, setCreatorMode] = useState<'character' | 'lorebook'>('character');
+  const [creatorMode, setCreatorMode] = useState<'character' | 'lorebook' | 'autonomous'>('character');
   const [lorebook, setLorebook] = useState<LorebookData>(createEmptyLorebook());
   const [kbFiles, setKbFiles] = useState<KBFile[]>([]);
+  const [isAutonomousGenerating, setIsAutonomousGenerating] = useState(false);
 
   // Chat History State
   const [charMessages, setCharMessages] = useState<ChatMessage[]>([]);
@@ -123,6 +124,8 @@ export const MainPopup: FC = () => {
       setIsLoading(true);
       setAllCharacters(globalContext.characters);
       setAllWorldNames(world_names);
+
+      // Load session
       const savedSession: Partial<Session> = JSON.parse(localStorage.getItem(SESSION_KEY) ?? '{}');
       const initialSession = createDefaultSession();
       if (savedSession.fields) initialSession.fields = { ...initialSession.fields, ...savedSession.fields };
@@ -136,14 +139,28 @@ export const MainPopup: FC = () => {
         if (char) setLoadedCharacter(char);
       }
       setSession(initialSession);
+
+      // Load KB Files
+      const savedKb = localStorage.getItem(`${SESSION_KEY}_kb`);
+      if (savedKb) {
+        try {
+          setKbFiles(JSON.parse(savedKb));
+        } catch (e) {
+          console.error('Failed to load KB files', e);
+        }
+      }
+
       setIsLoading(false);
     };
     loadData();
   }, []);
 
   useEffect(() => {
-    if (!isLoading) localStorage.setItem(SESSION_KEY, JSON.stringify(session));
-  }, [session, isLoading]);
+    if (!isLoading) {
+      localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+      localStorage.setItem(`${SESSION_KEY}_kb`, JSON.stringify(kbFiles));
+    }
+  }, [session, kbFiles, isLoading]);
 
   // --- Generic Setting Handlers ---
   const updateSetting = <K extends keyof ExtensionSettings>(key: K, value: ExtensionSettings[K]) => {
@@ -185,10 +202,13 @@ export const MainPopup: FC = () => {
 
   const handleGreetingsChange = useCallback((newGreetings: Greeting[]) => {
     setSession((prev) => {
+      // Create a fresh fields object to ensure React detects the change
       const newFields = { ...prev.fields };
+      // Clear existing alternate greetings
       Object.keys(newFields).forEach((key) => {
         if (key.startsWith('alternate_greetings_')) delete newFields[key];
       });
+      // Add new ones
       newGreetings.forEach((greeting, index) => {
         const fieldName = `alternate_greetings_${index + 1}`;
         newFields[fieldName] = { ...greeting, label: `Alternate Greeting ${index + 1}` };
@@ -196,6 +216,32 @@ export const MainPopup: FC = () => {
       return { ...prev, fields: newFields };
     });
   }, []);
+
+  const handleAutonomousGenerate = async (prompt: string, includeLorebook: boolean) => {
+    if (!settings.profileId) return st_echo('warning', 'Please select a connection profile.');
+    setIsAutonomousGenerating(true);
+    try {
+      const { character, lorebook: generatedLorebook } = await generateFullCharacter(
+        prompt,
+        includeLorebook,
+        settings.profileId,
+        settings.promptPresets[settings.promptPreset]?.content
+      );
+
+      const updatedSession = applyCharacterToSession(character, session);
+      setSession(updatedSession);
+
+      if (generatedLorebook) {
+        setLorebook(generatedLorebook);
+      }
+      st_echo('success', 'Character generated successfully!');
+    } catch (e: any) {
+      console.error(e);
+      st_echo('error', e.message || String(e));
+    } finally {
+      setIsAutonomousGenerating(false);
+    }
+  };
 
   const handleClearField = useCallback(
     (fieldId: string, isDraft: boolean) => {
@@ -576,6 +622,12 @@ export const MainPopup: FC = () => {
           onClick={() => setCreatorMode('character')}
         >
           <i className="fa-solid fa-user"></i> Character
+        </button>
+        <button
+          className={`mode-tab ${creatorMode === 'autonomous' ? 'active' : ''}`}
+          onClick={() => setCreatorMode('autonomous')}
+        >
+          <i className="fa-solid fa-robot"></i> Autonomous
         </button>
         <button
           className={`mode-tab ${creatorMode === 'lorebook' ? 'active' : ''}`}
@@ -985,6 +1037,7 @@ export const MainPopup: FC = () => {
               kbFiles={kbFiles}
               messages={charMessages}
               onMessagesChange={setCharMessages}
+              additionalInstructions={settings.promptPresets[settings.promptPreset]?.content}
             />
           </div>
         </div>
@@ -1009,9 +1062,22 @@ export const MainPopup: FC = () => {
               kbFiles={kbFiles}
               messages={lorebookMessages}
               onMessagesChange={setLorebookMessages}
+              additionalInstructions={settings.promptPresets[settings.promptPreset]?.content}
             />
           </div>
         </div>
+      )}
+
+      {/* AUTONOMOUS MODE */}
+      {creatorMode === 'autonomous' && (
+        <AutonomousMode
+          session={session}
+          onSessionUpdate={setSession}
+          profileId={settings.profileId}
+          isGenerating={isAutonomousGenerating}
+          onGenerateFullCharacter={handleAutonomousGenerate}
+          additionalInstructions={settings.promptPresets[settings.promptPreset]?.content}
+        />
       )}
 
       {/* FOOTER: Export & Save */}
@@ -1065,10 +1131,11 @@ export const MainPopup: FC = () => {
                       position: e.position,
                     })),
                     name: lorebook.name,
-                    extensions: {},
+                    description: lorebook.description,
                     scan_depth: lorebook.scan_depth,
                     token_budget: lorebook.token_budget,
                     recursive_scanning: lorebook.recursive_scanning,
+                    extensions: {},
                   },
                   lorebook.name
                 )}

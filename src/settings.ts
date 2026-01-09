@@ -20,7 +20,7 @@ import { globalContext } from './generate.js';
 
 export const extensionName = 'SillyTavern-Character-Creator';
 export const VERSION = '0.3.0';
-export const FORMAT_VERSION = 'F_1.9';
+export const FORMAT_VERSION = 'F_1.10';
 
 export const KEYS = {
   EXTENSION: 'charCreator',
@@ -110,6 +110,7 @@ export interface ExtensionSettings {
   showSaveAsWorldInfoEntry: {
     show: boolean;
   };
+  preferredTokenizer: number;
 }
 
 export type SystemPromptKey =
@@ -325,6 +326,7 @@ export const DEFAULT_SETTINGS: ExtensionSettings = {
   showSaveAsWorldInfoEntry: {
     show: false,
   },
+  preferredTokenizer: 13, // Default to Gemma
 };
 
 export function convertToVariableName(key: string) {

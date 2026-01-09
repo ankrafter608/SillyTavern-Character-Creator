@@ -1,5 +1,6 @@
 import { FC, useRef, useState, useEffect } from 'react';
 import { STButton } from 'sillytavern-utils-lib/components/react';
+import { settingsManager } from '../settings.js';
 
 export interface KBFile {
     id: string;
@@ -28,7 +29,7 @@ const TOKENIZER_OPTIONS = [
 
 export const KnowledgeBase: FC<KnowledgeBaseProps> = ({ files, onFilesChange }) => {
     const fileInputRef = useRef<HTMLInputElement>(null);
-    const [selectedTokenizer, setSelectedTokenizer] = useState(13); // Default to Gemma
+    const [selectedTokenizer, setSelectedTokenizer] = useState(settingsManager.getSettings().preferredTokenizer || 13);
     const [isCalculating, setIsCalculating] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
 
@@ -156,6 +157,12 @@ export const KnowledgeBase: FC<KnowledgeBaseProps> = ({ files, onFilesChange }) 
     const handleTokenizerChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
         const newId = Number(e.target.value);
         setSelectedTokenizer(newId);
+
+        // Update global settings
+        const settings = settingsManager.getSettings();
+        settings.preferredTokenizer = newId;
+        settingsManager.saveSettings();
+
         // Reset tokens to trigger recalculation for all files
         onFilesChange(files.map(f => ({ ...f, tokens: undefined })));
     };

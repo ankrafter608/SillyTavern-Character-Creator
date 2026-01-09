@@ -1,5 +1,6 @@
 import { FC } from 'react';
 import { STButton, STTextarea } from 'sillytavern-utils-lib/components/react';
+import { useTokenCount } from '../hooks/useTokenCount.js';
 
 export interface CharacterFieldProps {
   fieldId: string;
@@ -40,6 +41,8 @@ export const CharacterField: FC<CharacterFieldProps> = ({
   onDelete,
   onOpenReviseSessions,
 }) => {
+  const { tokens, isCalculating } = useTokenCount(value);
+
   return (
     <div className={`character-field ${isDraft ? 'draft-field' : 'core-field'}`}>
       <label>{label}</label>
@@ -60,7 +63,7 @@ export const CharacterField: FC<CharacterFieldProps> = ({
             <i className="fa-solid fa-eraser"></i>
           </STButton>
           {onOpenReviseSessions &&
-            !isDraft && ( // Disabling for draft fields initially for simplicity
+            !isDraft && (
               <STButton onClick={() => onOpenReviseSessions(fieldId)} title="Revise with AI chat">
                 <i className="fa-solid fa-comments"></i>
               </STButton>
@@ -75,6 +78,19 @@ export const CharacterField: FC<CharacterFieldProps> = ({
               <i className="fa-solid fa-trash-can"></i>
             </STButton>
           )}
+          <div className="token-counter" style={{
+            fontSize: '0.8em',
+            opacity: 0.5,
+            marginLeft: 'auto',
+            alignSelf: 'center',
+            fontFamily: 'monospace'
+          }}>
+            {isCalculating ? (
+              <i className="fa-solid fa-spinner fa-spin"></i>
+            ) : (
+              <>{tokens !== null ? `${tokens} tokens` : ''}</>
+            )}
+          </div>
         </div>
       </div>
       {promptEnabled && (

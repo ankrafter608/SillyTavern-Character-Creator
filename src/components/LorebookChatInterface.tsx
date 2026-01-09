@@ -19,6 +19,7 @@ interface LorebookChatInterfaceProps {
     kbFiles?: KBFile[];
     messages: ChatMessage[];
     onMessagesChange: (messages: ChatMessage[]) => void;
+    additionalInstructions?: string;
 }
 
 const globalContext = SillyTavern.getContext();
@@ -30,6 +31,11 @@ Current Lorebook: "{{lorebookName}}"
 {{#if kbContent}}
 REFERENCE MATERIALS (Use this information for accuracy):
 {{kbContent}}
+{{/if}}
+
+{{#if additionalInstructions}}
+IMPORTANT GUIDELINES & CONSTRAINTS (Priority: HIGH):
+{{additionalInstructions}}
 {{/if}}
 
 Current Entries:
@@ -86,6 +92,7 @@ export const LorebookChatInterface: FC<LorebookChatInterfaceProps> = ({
     kbFiles = [],
     messages,
     onMessagesChange,
+    additionalInstructions,
 }) => {
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -140,6 +147,7 @@ export const LorebookChatInterface: FC<LorebookChatInterfaceProps> = ({
                 currentEntriesJson,
                 userMessage: input.trim(),
                 kbContent,
+                additionalInstructions,
             });
 
             const response = await globalContext.ConnectionManagerRequestService.sendRequest(

@@ -13,6 +13,7 @@ interface ChatInterfaceProps {
     kbFiles?: KBFile[];
     messages: ChatMessage[];
     onMessagesChange: (messages: ChatMessage[]) => void;
+    additionalInstructions?: string;
 }
 
 export const ChatInterface: FC<ChatInterfaceProps> = ({
@@ -23,6 +24,7 @@ export const ChatInterface: FC<ChatInterfaceProps> = ({
     kbFiles,
     messages,
     onMessagesChange,
+    additionalInstructions,
 }) => {
     const [input, setInput] = useState('');
     const [isProcessing, setIsProcessing] = useState(false);
@@ -57,6 +59,7 @@ export const ChatInterface: FC<ChatInterfaceProps> = ({
                 profileId,
                 maxResponseToken,
                 kbFiles,
+                additionalInstructions,
             });
 
             onMessagesChange([...newMessages, aiMessage]);
