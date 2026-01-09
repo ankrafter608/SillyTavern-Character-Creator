@@ -31,6 +31,7 @@ import { KnowledgeBase, KBFile } from './KnowledgeBase.js';
 import { ChatMessage, generateFullCharacter, applyCharacterToSession } from '../autonomous-generator.js';
 import { AutonomousMode } from './AutonomousMode.js';
 import { exportCharacterAsJSON, exportLorebookAsJSON } from '../character-exporter.js';
+import { CharacterCreatorSettings } from './Settings.js';
 
 if (!Handlebars.helpers['join']) {
   Handlebars.registerHelper('join', function (array: any, separator: any) {
@@ -94,7 +95,7 @@ export const MainPopup: FC = () => {
   const [isGenerating, setIsGenerating] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'core' | 'draft'>('core');
-  const [creatorMode, setCreatorMode] = useState<'character' | 'lorebook' | 'autonomous'>('character');
+  const [creatorMode, setCreatorMode] = useState<'character' | 'lorebook' | 'autonomous' | 'settings'>('character');
   const [lorebook, setLorebook] = useState<LorebookData>(createEmptyLorebook());
   const [kbFiles, setKbFiles] = useState<KBFile[]>([]);
   const [isAutonomousGenerating, setIsAutonomousGenerating] = useState(false);
@@ -102,6 +103,7 @@ export const MainPopup: FC = () => {
   // Chat History State
   const [charMessages, setCharMessages] = useState<ChatMessage[]>([]);
   const [lorebookMessages, setLorebookMessages] = useState<any[]>([]);
+  const [autonomousMessages, setAutonomousMessages] = useState<ChatMessage[]>([]);
 
   const [allCharacters, setAllCharacters] = useState<Character[]>([]);
   const [allWorldNames, setAllWorldNames] = useState<string[]>([]);
@@ -140,7 +142,7 @@ export const MainPopup: FC = () => {
       }
       setSession(initialSession);
 
-      // Load KB Files
+      // Load Contexts
       const savedKb = localStorage.getItem(`${SESSION_KEY}_kb`);
       if (savedKb) {
         try {
@@ -149,6 +151,30 @@ export const MainPopup: FC = () => {
           console.error('Failed to load KB files', e);
         }
       }
+
+      const savedLorebook = localStorage.getItem(`${SESSION_KEY}_lorebook`);
+      if (savedLorebook) {
+        try {
+          setLorebook(JSON.parse(savedLorebook));
+        } catch (e) {
+          console.error('Failed to load lorebook', e);
+        }
+      }
+
+      const savedCharMsg = localStorage.getItem(`${SESSION_KEY}_char_msg`);
+      if (savedCharMsg) setCharMessages(JSON.parse(savedCharMsg));
+
+      const savedLorebookMsg = localStorage.getItem(`${SESSION_KEY}_lore_msg`);
+      if (savedLorebookMsg) setLorebookMessages(JSON.parse(savedLorebookMsg));
+
+      const savedAutoMsg = localStorage.getItem(`${SESSION_KEY}_auto_msg`);
+      if (savedAutoMsg) setAutonomousMessages(JSON.parse(savedAutoMsg));
+
+      const savedTab = localStorage.getItem(`${SESSION_KEY}_active_tab`);
+      if (savedTab) setActiveTab(savedTab as any);
+
+      const savedMode = localStorage.getItem(`${SESSION_KEY}_creator_mode`);
+      if (savedMode) setCreatorMode(savedMode as any);
 
       setIsLoading(false);
     };
@@ -159,8 +185,14 @@ export const MainPopup: FC = () => {
     if (!isLoading) {
       localStorage.setItem(SESSION_KEY, JSON.stringify(session));
       localStorage.setItem(`${SESSION_KEY}_kb`, JSON.stringify(kbFiles));
+      localStorage.setItem(`${SESSION_KEY}_lorebook`, JSON.stringify(lorebook));
+      localStorage.setItem(`${SESSION_KEY}_char_msg`, JSON.stringify(charMessages));
+      localStorage.setItem(`${SESSION_KEY}_lore_msg`, JSON.stringify(lorebookMessages));
+      localStorage.setItem(`${SESSION_KEY}_auto_msg`, JSON.stringify(autonomousMessages));
+      localStorage.setItem(`${SESSION_KEY}_active_tab`, activeTab);
+      localStorage.setItem(`${SESSION_KEY}_creator_mode`, creatorMode);
     }
-  }, [session, kbFiles, isLoading]);
+  }, [session, kbFiles, lorebook, charMessages, lorebookMessages, autonomousMessages, activeTab, creatorMode, isLoading]);
 
   // --- Generic Setting Handlers ---
   const updateSetting = <K extends keyof ExtensionSettings>(key: K, value: ExtensionSettings[K]) => {
@@ -635,6 +667,12 @@ export const MainPopup: FC = () => {
         >
           <i className="fa-solid fa-book"></i> Lorebook
         </button>
+        <button
+          className={`mode-tab ${creatorMode === 'settings' ? 'active' : ''}`}
+          onClick={() => setCreatorMode('settings')}
+        >
+          <i className="fa-solid fa-gear"></i> Settings
+        </button>
       </div>
 
       {creatorMode === 'character' && (
@@ -1077,7 +1115,18 @@ export const MainPopup: FC = () => {
           isGenerating={isAutonomousGenerating}
           onGenerateFullCharacter={handleAutonomousGenerate}
           additionalInstructions={settings.promptPresets[settings.promptPreset]?.content}
+          messages={autonomousMessages}
+          onMessagesChange={setAutonomousMessages}
         />
+      )}
+
+      {/* SETTINGS MODE */}
+      {creatorMode === 'settings' && (
+        <div className="container">
+          <div className="card" style={{ width: '100%', padding: '20px' }}>
+            <CharacterCreatorSettings />
+          </div>
+        </div>
       )}
 
       {/* FOOTER: Export & Save */}

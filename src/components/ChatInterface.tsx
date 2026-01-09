@@ -4,6 +4,7 @@ import { st_echo } from 'sillytavern-utils-lib/config';
 import { Session } from '../generate.js';
 import { sendChatMessage, ChatMessage } from '../autonomous-generator.js';
 import { KBFile } from './KnowledgeBase.js';
+import { settingsManager } from '../settings.js';
 
 interface ChatInterfaceProps {
     session: Session;
@@ -15,6 +16,17 @@ interface ChatInterfaceProps {
     onMessagesChange: (messages: ChatMessage[]) => void;
     additionalInstructions?: string;
 }
+
+/*
+const playNotificationSound = (type: 'success' | 'error') => {
+    const settings = settingsManager.getSettings().soundNotifications;
+    if (!settings?.enabled) return;
+
+    const audio = new Audio(`scripts/extensions/third-party/SillyTavern-Character-Creator/templates/${type}.wav`);
+    audio.volume = settings.volume ?? 0.5;
+    audio.play().catch(e => console.error('Failed to play sound:', e));
+};
+*/
 
 export const ChatInterface: FC<ChatInterfaceProps> = ({
     session,
@@ -64,6 +76,7 @@ export const ChatInterface: FC<ChatInterfaceProps> = ({
 
             onMessagesChange([...newMessages, aiMessage]);
             onSessionUpdate(updatedSession);
+            // playNotificationSound('success');
         } catch (error: any) {
             console.error('Chat error:', error);
             st_echo('error', `Chat error: ${error.message || String(error)}`);
@@ -75,6 +88,7 @@ export const ChatInterface: FC<ChatInterfaceProps> = ({
                 isError: true,
             };
             onMessagesChange([...newMessages, errorMessage]);
+            // playNotificationSound('error');
         } finally {
             setIsProcessing(false);
         }

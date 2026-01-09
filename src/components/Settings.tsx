@@ -367,6 +367,71 @@ export const CharacterCreatorSettings: FC = () => {
 
       <hr style={{ margin: '15px 0' }} />
 
+      <div className="card" style={{ padding: '15px' }}>
+        <h3>Sound Notifications</h3>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+          <label className="checkbox_label">
+            <input
+              type="checkbox"
+              checked={settings.soundNotifications?.enabled ?? true}
+              onChange={(e) =>
+                updateAndRefresh((s) => {
+                  if (!s.soundNotifications) s.soundNotifications = { enabled: true, volume: 0.5 };
+                  s.soundNotifications.enabled = e.target.checked;
+                })
+              }
+            />
+            Enable Sounds (Success/Error)
+          </label>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <i className="fa-solid fa-volume-high" />
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.01"
+              style={{ flex: 1 }}
+              value={settings.soundNotifications?.volume ?? 0.5}
+              onChange={(e) =>
+                updateAndRefresh((s) => {
+                  if (!s.soundNotifications) s.soundNotifications = { enabled: true, volume: 0.5 };
+                  s.soundNotifications.volume = parseFloat(e.target.value);
+                })
+              }
+            />
+            <span style={{ minWidth: '40px', textAlign: 'right', fontFamily: 'monospace' }}>
+              {Math.round((settings.soundNotifications?.volume ?? 0.5) * 100)}%
+            </span>
+          </div>
+
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <STButton
+              style={{ flex: 1 }}
+              onClick={() => {
+                const audio = new Audio('scripts/extensions/third-party/SillyTavern-Character-Creator/templates/success.wav');
+                audio.volume = settings.soundNotifications?.volume ?? 0.5;
+                audio.play();
+              }}
+            >
+              Test Success Sound
+            </STButton>
+            <STButton
+              style={{ flex: 1 }}
+              onClick={() => {
+                const audio = new Audio('scripts/extensions/third-party/SillyTavern-Character-Creator/templates/alert.wav');
+                audio.volume = settings.soundNotifications?.volume ?? 0.5;
+                audio.play();
+              }}
+            >
+              Test Error Sound
+            </STButton>
+          </div>
+        </div>
+      </div>
+
+      <hr style={{ margin: '15px 0' }} />
+
       <div style={{ textAlign: 'center', marginTop: '15px' }}>
         <STButton className="danger_button" style={{ width: 'auto' }} onClick={handleResetEverything}>
           <i style={{ marginRight: '10px' }} className="fa-solid fa-triangle-exclamation" />I messed up, reset

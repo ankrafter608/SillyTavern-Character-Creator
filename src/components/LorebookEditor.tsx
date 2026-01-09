@@ -1,5 +1,6 @@
 import { FC, useState, useCallback, useEffect } from 'react';
 import { STButton, STTextarea } from 'sillytavern-utils-lib/components/react';
+import { useTokenCount } from '../hooks/useTokenCount.js';
 
 export interface LorebookEntry {
     id: string;
@@ -290,6 +291,7 @@ export const LorebookEditor: FC<LorebookEditorProps> = ({
                                         rows={8}
                                         placeholder="The lore content that will be injected when keys are triggered..."
                                     />
+                                    <LorebookTokenCounter content={activeEntry.content} />
                                 </label>
 
                                 <div className="entry-options">
@@ -372,6 +374,25 @@ export const LorebookEditor: FC<LorebookEditorProps> = ({
                     )}
                 </div>
             </div>
+        </div>
+    );
+};
+
+const LorebookTokenCounter: FC<{ content: string }> = ({ content }) => {
+    const { tokens, isCalculating } = useTokenCount(content);
+    return (
+        <div className="token-counter" style={{
+            fontSize: '0.8em',
+            opacity: 0.5,
+            marginTop: '4px',
+            textAlign: 'right',
+            fontFamily: 'monospace'
+        }}>
+            {isCalculating ? (
+                <i className="fa-solid fa-spinner fa-spin"></i>
+            ) : (
+                <>{tokens !== null ? `${tokens} tokens` : ''}</>
+            )}
         </div>
     );
 };

@@ -111,6 +111,10 @@ export interface ExtensionSettings {
     show: boolean;
   };
   preferredTokenizer: number;
+  soundNotifications: {
+    enabled: boolean;
+    volume: number;
+  };
 }
 
 export type SystemPromptKey =
@@ -327,6 +331,10 @@ export const DEFAULT_SETTINGS: ExtensionSettings = {
     show: false,
   },
   preferredTokenizer: 13, // Default to Gemma
+  soundNotifications: {
+    enabled: true,
+    volume: 0.5,
+  },
 };
 
 export function convertToVariableName(key: string) {
