@@ -25,6 +25,8 @@ import { CompareFieldPopup } from './CompareFieldPopup.js';
 import { CharacterState, ReviseSessionType } from '../revise-types.js';
 import { ReviseSessionManager } from './ReviseSessionManager.js';
 import { ChatInterface } from './ChatInterface.js';
+import { LorebookEditor, LorebookData, createEmptyLorebook } from './LorebookEditor.js';
+import { LorebookChatInterface } from './LorebookChatInterface.js';
 // import { generateFullCharacter, applyCharacterToSession } from '../autonomous-generator.js';
 import { exportCharacterAsJSON, exportLorebookAsJSON } from '../character-exporter.js';
 
@@ -90,6 +92,8 @@ export const MainPopup: FC = () => {
   const [isGenerating, setIsGenerating] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'core' | 'draft'>('core');
+  const [creatorMode, setCreatorMode] = useState<'character' | 'lorebook'>('character');
+  const [lorebook, setLorebook] = useState<LorebookData>(createEmptyLorebook());
 
   const [allCharacters, setAllCharacters] = useState<Character[]>([]);
   const [allWorldNames, setAllWorldNames] = useState<string[]>([]);
@@ -558,444 +562,512 @@ export const MainPopup: FC = () => {
     <div id="charCreatorPopup">
       <h2>Character Creator</h2>
 
-      <div className="container">
-        {/* LEFT COLUMN: Controls & Fields */}
-        <div className="column-left">
-          <div className="card">
-            <h3>Connection Profile</h3>
-            <STConnectionProfileSelect
-              initialSelectedProfileId={settings.profileId}
-              onChange={(p) => updateSetting('profileId', p?.id ?? '')}
-            />
-          </div>
+      {/* Mode Tabs */}
+      <div className="mode-tabs">
+        <button
+          className={`mode-tab ${creatorMode === 'character' ? 'active' : ''}`}
+          onClick={() => setCreatorMode('character')}
+        >
+          <i className="fa-solid fa-user"></i> Character
+        </button>
+        <button
+          className={`mode-tab ${creatorMode === 'lorebook' ? 'active' : ''}`}
+          onClick={() => setCreatorMode('lorebook')}
+        >
+          <i className="fa-solid fa-book"></i> Lorebook
+        </button>
+      </div>
 
-          <div className="card">
-            <h3>Context to Send</h3>
-            <div className="context-options">
-              <label className="checkbox_label">
-                <input
-                  type="checkbox"
-                  checked={settings.contextToSend.stDescription}
-                  onChange={(e) => updateContextToSend('stDescription', e.target.checked)}
-                />{' '}
-                Description of SillyTavern & Char Card
-              </label>
-              <label className="checkbox_label">
-                <input
-                  type="checkbox"
-                  checked={settings.contextToSend.persona}
-                  onChange={(e) => updateContextToSend('persona', e.target.checked)}
-                />{' '}
-                User's Persona
-              </label>
+      {creatorMode === 'character' && (
+        <div className="container">
+          {/* LEFT COLUMN: Controls & Fields */}
+          <div className="column-left">
+            <div className="card">
+              <h3>Connection Profile</h3>
+              <STConnectionProfileSelect
+                initialSelectedProfileId={settings.profileId}
+                onChange={(p) => updateSetting('profileId', p?.id ?? '')}
+              />
+            </div>
 
-              {(this_chid !== undefined || selected_group) && (
-                <div className="message-options">
-                  <h4>Messages to Include</h4>
-                  <select
-                    className="text_pole"
-                    value={settings.contextToSend.messages.type}
-                    onChange={(e) =>
-                      updateContextToSend('messages', {
-                        ...settings.contextToSend.messages,
-                        type: e.target.value as any,
-                      })
-                    }
-                  >
-                    <option value="none">None</option>
-                    <option value="all">All Messages</option>
-                    <option value="first">First X Messages</option>
-                    <option value="last">Last X Messages</option>
-                    <option value="range">Range</option>
-                  </select>
-                  {settings.contextToSend.messages.type === 'first' && (
-                    <div style={{ marginTop: '10px' }}>
-                      <label>
-                        First{' '}
-                        <input
-                          type="number"
-                          className="text_pole small message-input"
-                          min="1"
-                          value={settings.contextToSend.messages.first ?? 10}
-                          onChange={(e) =>
-                            updateContextToSend('messages', {
-                              ...settings.contextToSend.messages,
-                              first: parseInt(e.target.value) || 10,
-                            })
-                          }
-                        />{' '}
-                        Messages
-                      </label>
-                    </div>
-                  )}
-                  {settings.contextToSend.messages.type === 'last' && (
-                    <div style={{ marginTop: '10px' }}>
-                      <label>
-                        Last{' '}
-                        <input
-                          type="number"
-                          className="text_pole small message-input"
-                          min="1"
-                          value={settings.contextToSend.messages.last ?? 10}
-                          onChange={(e) =>
-                            updateContextToSend('messages', {
-                              ...settings.contextToSend.messages,
-                              last: parseInt(e.target.value) || 10,
-                            })
-                          }
-                        />{' '}
-                        Messages
-                      </label>
-                    </div>
-                  )}
-                  {settings.contextToSend.messages.type === 'range' && (
-                    <div style={{ marginTop: '10px' }}>
-                      <label>
-                        Range:{' '}
-                        <input
-                          type="number"
-                          className="text_pole small message-input"
-                          min="0"
-                          placeholder="Start"
-                          value={settings.contextToSend.messages.range?.start ?? 0}
-                          onChange={(e) =>
-                            updateContextToSend('messages', {
-                              ...settings.contextToSend.messages,
-                              range: {
-                                ...settings.contextToSend.messages.range!,
-                                start: parseInt(e.target.value) || 0,
-                              },
-                            })
-                          }
-                        />{' '}
-                        to{' '}
-                        <input
-                          type="number"
-                          className="text_pole small message-input"
-                          min="1"
-                          placeholder="End"
-                          value={settings.contextToSend.messages.range?.end ?? 10}
-                          onChange={(e) =>
-                            updateContextToSend('messages', {
-                              ...settings.contextToSend.messages,
-                              range: { ...settings.contextToSend.messages.range!, end: parseInt(e.target.value) || 10 },
-                            })
-                          }
-                        />
-                      </label>
-                    </div>
+            <div className="card">
+              <h3>Context to Send</h3>
+              <div className="context-options">
+                <label className="checkbox_label">
+                  <input
+                    type="checkbox"
+                    checked={settings.contextToSend.stDescription}
+                    onChange={(e) => updateContextToSend('stDescription', e.target.checked)}
+                  />{' '}
+                  Description of SillyTavern & Char Card
+                </label>
+                <label className="checkbox_label">
+                  <input
+                    type="checkbox"
+                    checked={settings.contextToSend.persona}
+                    onChange={(e) => updateContextToSend('persona', e.target.checked)}
+                  />{' '}
+                  User's Persona
+                </label>
+
+                {(this_chid !== undefined || selected_group) && (
+                  <div className="message-options">
+                    <h4>Messages to Include</h4>
+                    <select
+                      className="text_pole"
+                      value={settings.contextToSend.messages.type}
+                      onChange={(e) =>
+                        updateContextToSend('messages', {
+                          ...settings.contextToSend.messages,
+                          type: e.target.value as any,
+                        })
+                      }
+                    >
+                      <option value="none">None</option>
+                      <option value="all">All Messages</option>
+                      <option value="first">First X Messages</option>
+                      <option value="last">Last X Messages</option>
+                      <option value="range">Range</option>
+                    </select>
+                    {settings.contextToSend.messages.type === 'first' && (
+                      <div style={{ marginTop: '10px' }}>
+                        <label>
+                          First{' '}
+                          <input
+                            type="number"
+                            className="text_pole small message-input"
+                            min="1"
+                            value={settings.contextToSend.messages.first ?? 10}
+                            onChange={(e) =>
+                              updateContextToSend('messages', {
+                                ...settings.contextToSend.messages,
+                                first: e.target.value === '' ? 0 : parseInt(e.target.value),
+                              })
+                            }
+                          />{' '}
+                          Messages
+                        </label>
+                      </div>
+                    )}
+                    {settings.contextToSend.messages.type === 'last' && (
+                      <div style={{ marginTop: '10px' }}>
+                        <label>
+                          Last{' '}
+                          <input
+                            type="number"
+                            className="text_pole small message-input"
+                            min="1"
+                            value={settings.contextToSend.messages.last ?? 10}
+                            onChange={(e) =>
+                              updateContextToSend('messages', {
+                                ...settings.contextToSend.messages,
+                                last: e.target.value === '' ? 0 : parseInt(e.target.value),
+                              })
+                            }
+                          />{' '}
+                          Messages
+                        </label>
+                      </div>
+                    )}
+                    {settings.contextToSend.messages.type === 'range' && (
+                      <div style={{ marginTop: '10px' }}>
+                        <label>
+                          Range:{' '}
+                          <input
+                            type="number"
+                            className="text_pole small message-input"
+                            min="0"
+                            placeholder="Start"
+                            value={settings.contextToSend.messages.range?.start ?? 0}
+                            onChange={(e) =>
+                              updateContextToSend('messages', {
+                                ...settings.contextToSend.messages,
+                                range: {
+                                  ...settings.contextToSend.messages.range!,
+                                  start: e.target.value === '' ? 0 : parseInt(e.target.value),
+                                },
+                              })
+                            }
+                          />{' '}
+                          to{' '}
+                          <input
+                            type="number"
+                            className="text_pole small message-input"
+                            min="1"
+                            placeholder="End"
+                            value={settings.contextToSend.messages.range?.end ?? 10}
+                            onChange={(e) =>
+                              updateContextToSend('messages', {
+                                ...settings.contextToSend.messages,
+                                range: { ...settings.contextToSend.messages.range!, end: e.target.value === '' ? 0 : parseInt(e.target.value) },
+                              })
+                            }
+                          />
+                        </label>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <label className="checkbox_label">
+                  <input
+                    type="checkbox"
+                    checked={settings.contextToSend.charCard}
+                    onChange={(e) => updateContextToSend('charCard', e.target.checked)}
+                  />{' '}
+                  Selected Characters' Data
+                </label>
+                {settings.contextToSend.charCard && (
+                  <STFancyDropdown
+                    items={characterDropdownItems}
+                    value={session.selectedCharacterIndexes}
+                    onChange={(v) => setSession((s) => ({ ...s, selectedCharacterIndexes: v }))}
+                    multiple
+                    enableSearch
+                  />
+                )}
+
+                <label className="checkbox_label">
+                  <input
+                    type="checkbox"
+                    checked={settings.contextToSend.worldInfo}
+                    onChange={(e) => updateContextToSend('worldInfo', e.target.checked)}
+                  />{' '}
+                  Selected World Info
+                </label>
+                {settings.contextToSend.worldInfo && (
+                  <STFancyDropdown
+                    items={worldInfoDropdownItems}
+                    value={session.selectedWorldNames}
+                    onChange={(v) => setSession((s) => ({ ...s, selectedWorldNames: v }))}
+                    multiple
+                    enableSearch
+                  />
+                )}
+
+                <label className="checkbox_label">
+                  <input
+                    type="checkbox"
+                    checked={settings.contextToSend.existingFields}
+                    onChange={(e) => updateContextToSend('existingFields', e.target.checked)}
+                  />{' '}
+                  Existing Field Content
+                </label>
+                <label className="checkbox_label">
+                  <input
+                    type="checkbox"
+                    checked={settings.contextToSend.dontSendOtherGreetings}
+                    onChange={(e) => updateContextToSend('dontSendOtherGreetings', e.target.checked)}
+                  />{' '}
+                  Don't send other alternate greetings
+                </label>
+              </div>
+            </div>
+
+            <div className="card">
+              <h3>Generation Options</h3>
+              <label title="You can edit in extension settings">
+                Main Context Template
+                <STPresetSelect
+                  onItemsChange={() => { }}
+                  label="Main Context Template"
+                  items={mainContextPresetItems}
+                  value={settings.mainContextTemplatePreset}
+                  onChange={(v) => updateSetting('mainContextTemplatePreset', v ?? 'default')}
+                />
+              </label>
+              <label>
+                Max Context Tokens
+                <select
+                  className="text_pole"
+                  value={settings.maxContextType}
+                  onChange={(e) => updateSetting('maxContextType', e.target.value as any)}
+                >
+                  <option value="profile">Use profile preset</option>
+                  <option value="sampler">Use active preset</option>
+                  <option value="custom">Custom</option>
+                </select>
+              </label>
+              {settings.maxContextType === 'custom' && (
+                <input
+                  type="number"
+                  className="text_pole"
+                  value={settings.maxContextValue}
+                  onChange={(e) => updateSetting('maxContextValue', e.target.value === '' ? 0 : parseInt(e.target.value))}
+                />
+              )}
+              <label>
+                Max Response Tokens
+                <input
+                  type="number"
+                  className="text_pole"
+                  value={settings.maxResponseToken}
+                  onChange={(e) => updateSetting('maxResponseToken', e.target.value === '' ? 0 : parseInt(e.target.value))}
+                />
+              </label>
+              <label>
+                Output Format
+                <select
+                  className="text_pole"
+                  value={settings.outputFormat}
+                  onChange={(e) => updateSetting('outputFormat', e.target.value as any)}
+                >
+                  <option value="none">Plain Text</option>
+                  <option value="xml">XML</option>
+                  <option value="json">JSON</option>
+                </select>
+              </label>
+            </div>
+
+            <div className="card">
+              <h3>Additional Instructions</h3>
+              <STPresetSelect
+                label="Prompt Preset"
+                items={promptPresetItems}
+                value={settings.promptPreset}
+                onChange={(v) => updateSetting('promptPreset', v ?? 'default')}
+                onItemsChange={(items) =>
+                  updateSetting(
+                    'promptPresets',
+                    items.reduce(
+                      (acc, i) => ({ ...acc, [i.value]: settings.promptPresets[i.value] ?? { content: '' } }),
+                      {},
+                    ),
+                  )
+                }
+                enableCreate
+                enableDelete
+                enableRename
+                readOnlyValues={['default']}
+              />
+              <STTextarea
+                value={settings.promptPresets[settings.promptPreset]?.content ?? ''}
+                onChange={(e) =>
+                  updateSetting('promptPresets', {
+                    ...settings.promptPresets,
+                    [settings.promptPreset]: { content: e.target.value },
+                  })
+                }
+                rows={4}
+              />
+            </div>
+
+
+            <div className="card">
+              <h3>Actions</h3>
+              <div className="character-field-actions">
+                <STButton
+                  onClick={handleOpenGlobalReviseSessions}
+                  title="Open global revision sessions to edit multiple fields at once"
+                >
+                  <i className="fa-solid fa-comments"></i>
+                </STButton>
+                <STButton onClick={handleReset} title="Reset all fields">
+                  <i className="fa-solid fa-rotate-left"></i> Reset
+                </STButton>
+                <div style={{ width: '200px' }} title="Load Character Data">
+                  <STFancyDropdown
+                    items={characterDropdownItems}
+                    value={loadedCharacter ? [String(allCharacters.indexOf(loadedCharacter))] : []}
+                    onChange={(v) => handleLoadCharacter(v[0])}
+                    multiple={false}
+                    enableSearch
+                    placeholder="Load Character..."
+                  />
+                </div>
+                <STButton onClick={handleImportDrafts}>Import JSON</STButton>
+              </div>
+            </div>
+
+            <div className="card">
+              <div className="tab-buttons">
+                <STButton
+                  onClick={() => setActiveTab('core')}
+                  className={`menu_button tab-button ${activeTab === 'core' ? 'active' : ''}`}
+                >
+                  Core Fields
+                </STButton>
+                <STButton
+                  onClick={() => setActiveTab('draft')}
+                  className={`menu_button tab-button ${activeTab === 'draft' ? 'active' : ''}`}
+                >
+                  Draft Fields
+                </STButton>
+                <div className="right-aligned">
+                  {activeTab === 'draft' && (
+                    <>
+                      <STButton onClick={handleAddDraftField}>
+                        <i className="fa-solid fa-plus"></i> Add
+                      </STButton>
+                      <STButton onClick={handleExportDrafts}>Export</STButton>
+                      <STButton onClick={handleImportDrafts}>Import</STButton>
+                    </>
                   )}
                 </div>
-              )}
-
-              <label className="checkbox_label">
-                <input
-                  type="checkbox"
-                  checked={settings.contextToSend.charCard}
-                  onChange={(e) => updateContextToSend('charCard', e.target.checked)}
-                />{' '}
-                Selected Characters' Data
-              </label>
-              {settings.contextToSend.charCard && (
-                <STFancyDropdown
-                  items={characterDropdownItems}
-                  value={session.selectedCharacterIndexes}
-                  onChange={(v) => setSession((s) => ({ ...s, selectedCharacterIndexes: v }))}
-                  multiple
-                  enableSearch
-                />
-              )}
-
-              <label className="checkbox_label">
-                <input
-                  type="checkbox"
-                  checked={settings.contextToSend.worldInfo}
-                  onChange={(e) => updateContextToSend('worldInfo', e.target.checked)}
-                />{' '}
-                Selected World Info
-              </label>
-              {settings.contextToSend.worldInfo && (
-                <STFancyDropdown
-                  items={worldInfoDropdownItems}
-                  value={session.selectedWorldNames}
-                  onChange={(v) => setSession((s) => ({ ...s, selectedWorldNames: v }))}
-                  multiple
-                  enableSearch
-                />
-              )}
-
-              <label className="checkbox_label">
-                <input
-                  type="checkbox"
-                  checked={settings.contextToSend.existingFields}
-                  onChange={(e) => updateContextToSend('existingFields', e.target.checked)}
-                />{' '}
-                Existing Field Content
-              </label>
-              <label className="checkbox_label">
-                <input
-                  type="checkbox"
-                  checked={settings.contextToSend.dontSendOtherGreetings}
-                  onChange={(e) => updateContextToSend('dontSendOtherGreetings', e.target.checked)}
-                />{' '}
-                Don't send other alternate greetings
-              </label>
-            </div>
-          </div>
-
-          <div className="card">
-            <h3>Generation Options</h3>
-            <label title="You can edit in extension settings">
-              Main Context Template
-              <STPresetSelect
-                onItemsChange={() => { }}
-                label="Main Context Template"
-                items={mainContextPresetItems}
-                value={settings.mainContextTemplatePreset}
-                onChange={(v) => updateSetting('mainContextTemplatePreset', v ?? 'default')}
-              />
-            </label>
-            <label>
-              Max Context Tokens
-              <select
-                className="text_pole"
-                value={settings.maxContextType}
-                onChange={(e) => updateSetting('maxContextType', e.target.value as any)}
-              >
-                <option value="profile">Use profile preset</option>
-                <option value="sampler">Use active preset</option>
-                <option value="custom">Custom</option>
-              </select>
-            </label>
-            {settings.maxContextType === 'custom' && (
-              <input
-                type="number"
-                className="text_pole"
-                value={settings.maxContextValue}
-                onChange={(e) => updateSetting('maxContextValue', parseInt(e.target.value) || 16384)}
-              />
-            )}
-            <label>
-              Max Response Tokens
-              <input
-                type="number"
-                className="text_pole"
-                value={settings.maxResponseToken}
-                onChange={(e) => updateSetting('maxResponseToken', parseInt(e.target.value) || 1024)}
-              />
-            </label>
-            <label>
-              Output Format
-              <select
-                className="text_pole"
-                value={settings.outputFormat}
-                onChange={(e) => updateSetting('outputFormat', e.target.value as any)}
-              >
-                <option value="none">Plain Text</option>
-                <option value="xml">XML</option>
-                <option value="json">JSON</option>
-              </select>
-            </label>
-          </div>
-
-          <div className="card">
-            <h3>Additional Instructions</h3>
-            <STPresetSelect
-              label="Prompt Preset"
-              items={promptPresetItems}
-              value={settings.promptPreset}
-              onChange={(v) => updateSetting('promptPreset', v ?? 'default')}
-              onItemsChange={(items) =>
-                updateSetting(
-                  'promptPresets',
-                  items.reduce(
-                    (acc, i) => ({ ...acc, [i.value]: settings.promptPresets[i.value] ?? { content: '' } }),
-                    {},
-                  ),
-                )
-              }
-              enableCreate
-              enableDelete
-              enableRename
-              readOnlyValues={['default']}
-            />
-            <STTextarea
-              value={settings.promptPresets[settings.promptPreset]?.content ?? ''}
-              onChange={(e) =>
-                updateSetting('promptPresets', {
-                  ...settings.promptPresets,
-                  [settings.promptPreset]: { content: e.target.value },
-                })
-              }
-              rows={4}
-            />
-          </div>
-
-
-          <div className="card">
-            <h3>Actions</h3>
-            <div className="character-field-actions">
-              <STButton
-                onClick={handleOpenGlobalReviseSessions}
-                title="Open global revision sessions to edit multiple fields at once"
-              >
-                <i className="fa-solid fa-comments"></i>
-              </STButton>
-              <STButton onClick={handleReset} title="Reset all fields">
-                <i className="fa-solid fa-rotate-left"></i> Reset
-              </STButton>
-              <div style={{ width: '200px' }} title="Load Character Data">
-                <STFancyDropdown
-                  items={characterDropdownItems}
-                  value={loadedCharacter ? [String(allCharacters.indexOf(loadedCharacter))] : []}
-                  onChange={(v) => handleLoadCharacter(v[0])}
-                  multiple={false}
-                  enableSearch
-                  placeholder="Load Character..."
-                />
               </div>
-              <STButton onClick={handleImportDrafts}>Import JSON</STButton>
-            </div>
-          </div>
 
-          <div className="card">
-            <div className="tab-buttons">
-              <STButton
-                onClick={() => setActiveTab('core')}
-                className={`menu_button tab-button ${activeTab === 'core' ? 'active' : ''}`}
-              >
-                Core Fields
-              </STButton>
-              <STButton
-                onClick={() => setActiveTab('draft')}
-                className={`menu_button tab-button ${activeTab === 'draft' ? 'active' : ''}`}
-              >
-                Draft Fields
-              </STButton>
-              <div className="right-aligned">
-                {activeTab === 'draft' && (
-                  <>
-                    <STButton onClick={handleAddDraftField}>
-                      <i className="fa-solid fa-plus"></i> Add
-                    </STButton>
-                    <STButton onClick={handleExportDrafts}>Export</STButton>
-                    <STButton onClick={handleImportDrafts}>Import</STButton>
-                  </>
-                )}
-              </div>
-            </div>
+              <div className="tab-content-area">
+                <div className={`tab-content ${activeTab === 'core' ? 'active' : ''}`}>
+                  {CHARACTER_FIELDS.map((fieldId) => {
+                    const config = fieldConfigs[fieldId as keyof typeof fieldConfigs];
+                    if (!config) return null;
+                    return (
+                      <CharacterField
+                        key={fieldId}
+                        fieldId={fieldId}
+                        label={config.label}
+                        value={session.fields[fieldId]?.value ?? ''}
+                        prompt={session.fields[fieldId]?.prompt ?? ''}
+                        large={config.large}
+                        rows={config.rows}
+                        promptEnabled={config.promptEnabled}
+                        isGenerating={isGenerating.includes(fieldId)}
+                        onValueChange={(id, v) => handleFieldChange(id, v, 'value', false)}
+                        onPromptChange={(id, p) => handleFieldChange(id, p, 'prompt', false)}
+                        onGenerate={handleGenerate}
+                        onContinue={(id) => handleGenerate(id, session.fields[id].value)}
+                        onClear={(id) => handleClearField(id, false)}
+                        onCompare={handleCompare}
+                        onOpenReviseSessions={handleOpenReviseSessions}
+                      />
+                    );
+                  })}
+                  <AlternateGreetings
+                    greetings={greetings}
+                    onGreetingsChange={handleGreetingsChange}
+                    isGenerating={isGenerating.some((id) => id.startsWith('alternate_greetings_'))}
+                    onGenerate={(i) => handleGenerate(`alternate_greetings_${i + 1}`)}
+                    onContinue={(i) => handleGenerate(`alternate_greetings_${i + 1}`, greetings[i].value)}
+                    onCompare={handleCompare}
+                  />
+                </div>
 
-            <div className="tab-content-area">
-              <div className={`tab-content ${activeTab === 'core' ? 'active' : ''}`}>
-                {CHARACTER_FIELDS.map((fieldId) => {
-                  const config = fieldConfigs[fieldId as keyof typeof fieldConfigs];
-                  if (!config) return null;
-                  return (
+                <div className={`tab-content ${activeTab === 'draft' ? 'active' : ''}`}>
+                  {Object.entries(session.draftFields).map(([fieldId, data]) => (
                     <CharacterField
                       key={fieldId}
                       fieldId={fieldId}
-                      label={config.label}
-                      value={session.fields[fieldId]?.value ?? ''}
-                      prompt={session.fields[fieldId]?.prompt ?? ''}
-                      large={config.large}
-                      rows={config.rows}
-                      promptEnabled={config.promptEnabled}
+                      label={data.label}
+                      value={data.value}
+                      prompt={data.prompt}
+                      isDraft
+                      rows={5}
                       isGenerating={isGenerating.includes(fieldId)}
-                      onValueChange={(id, v) => handleFieldChange(id, v, 'value', false)}
-                      onPromptChange={(id, p) => handleFieldChange(id, p, 'prompt', false)}
+                      onValueChange={(id, v) => handleFieldChange(id, v, 'value', true)}
+                      onPromptChange={(id, p) => handleFieldChange(id, p, 'prompt', true)}
                       onGenerate={handleGenerate}
-                      onContinue={(id) => handleGenerate(id, session.fields[id].value)}
-                      onClear={(id) => handleClearField(id, false)}
-                      onCompare={handleCompare}
-                      onOpenReviseSessions={handleOpenReviseSessions}
+                      onContinue={(id) => handleGenerate(id, session.draftFields[id].value)}
+                      onClear={(id) => handleClearField(id, true)}
+                      onDelete={handleDeleteDraftField}
                     />
-                  );
-                })}
-                <AlternateGreetings
-                  greetings={greetings}
-                  onGreetingsChange={handleGreetingsChange}
-                  isGenerating={isGenerating.some((id) => id.startsWith('alternate_greetings_'))}
-                  onGenerate={(i) => handleGenerate(`alternate_greetings_${i + 1}`)}
-                  onContinue={(i) => handleGenerate(`alternate_greetings_${i + 1}`, greetings[i].value)}
-                  onCompare={handleCompare}
-                />
-              </div>
-
-              <div className={`tab-content ${activeTab === 'draft' ? 'active' : ''}`}>
-                {Object.entries(session.draftFields).map(([fieldId, data]) => (
-                  <CharacterField
-                    key={fieldId}
-                    fieldId={fieldId}
-                    label={data.label}
-                    value={data.value}
-                    prompt={data.prompt}
-                    isDraft
-                    rows={5}
-                    isGenerating={isGenerating.includes(fieldId)}
-                    onValueChange={(id, v) => handleFieldChange(id, v, 'value', true)}
-                    onPromptChange={(id, p) => handleFieldChange(id, p, 'prompt', true)}
-                    onGenerate={handleGenerate}
-                    onContinue={(id) => handleGenerate(id, session.draftFields[id].value)}
-                    onClear={(id) => handleClearField(id, true)}
-                    onDelete={handleDeleteDraftField}
-                  />
-                ))}
+                  ))}
+                </div>
               </div>
             </div>
           </div>
-        </div>
 
-        {/* RIGHT COLUMN: Chat Interface */}
-        <div className="column-right">
-          <ChatInterface
-            session={session}
-            onSessionUpdate={setSession}
-            profileId={settings.profileId}
-            maxResponseToken={settings.maxResponseToken}
-          />
+          {/* RIGHT COLUMN: Chat Interface */}
+          <div className="column-right">
+            <ChatInterface
+              session={session}
+              onSessionUpdate={setSession}
+              profileId={settings.profileId}
+              maxResponseToken={settings.maxResponseToken}
+            />
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* LOREBOOK MODE */}
+      {creatorMode === 'lorebook' && (
+        <div className="container">
+          <div className="column-left" style={{ width: '60%' }}>
+            <LorebookEditor
+              lorebook={lorebook}
+              onLorebookChange={setLorebook}
+            />
+          </div>
+          <div className="column-right" style={{ width: '40%' }}>
+            <LorebookChatInterface
+              lorebook={lorebook}
+              onLorebookChange={setLorebook}
+              profileId={settings.profileId}
+              maxResponseToken={settings.maxResponseToken}
+            />
+          </div>
+        </div>
+      )}
 
       {/* FOOTER: Export & Save */}
       <div className="card export-panel" style={{ marginTop: '20px' }}>
         <h3>Save & Export</h3>
         <div className="button-group" style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-          <STButton onClick={handleSaveAsNew} className="menu_button confirm">
-            Create in SillyTavern
-          </STButton>
-          <STButton onClick={handleOverride} className="menu_button warning" disabled={!loadedCharacter}>
-            Update Loaded Character
-          </STButton>
-          <div style={{ flexGrow: 1 }}></div>
-          <STButton
-            onClick={() => {
-              const charData = {
-                name: session.fields.name.value,
-                description: session.fields.description.value,
-                personality: session.fields.personality.value,
-                scenario: session.fields.scenario.value,
-                first_mes: session.fields.first_mes.value,
-                mes_example: session.fields.mes_example.value,
-                alternate_greetings: greetings.map((g) => g.value),
-              };
-              exportCharacterAsJSON(charData as any);
-            }}
-          >
-            Export JSON (V3)
-          </STButton>
-          <STButton onClick={() => exportLorebookAsJSON(
-            {
-              entries: [],
-              name: `${session.fields.name.value} Lorebook`,
-              extensions: {},
-              scan_depth: 2,
-              token_budget: 2048,
-              recursive_scanning: false,
-            } as any,
-            session.fields.name.value
-          )}>
-            Export Lorebook JSON (Empty)
-          </STButton>
+          {creatorMode === 'character' && (
+            <>
+              <STButton onClick={handleSaveAsNew} className="menu_button confirm">
+                Create in SillyTavern
+              </STButton>
+              <STButton onClick={handleOverride} className="menu_button warning" disabled={!loadedCharacter}>
+                Update Loaded Character
+              </STButton>
+              <div style={{ flexGrow: 1 }}></div>
+              <STButton
+                onClick={() => {
+                  const charData = {
+                    name: session.fields.name.value,
+                    description: session.fields.description.value,
+                    personality: session.fields.personality.value,
+                    scenario: session.fields.scenario.value,
+                    first_mes: session.fields.first_mes.value,
+                    mes_example: session.fields.mes_example.value,
+                    alternate_greetings: greetings.map((g) => g.value),
+                  };
+                  exportCharacterAsJSON(charData as any);
+                }}
+              >
+                Export JSON (V3)
+              </STButton>
+            </>
+          )}
+          {creatorMode === 'lorebook' && (
+            <>
+              <STButton
+                onClick={() => exportLorebookAsJSON(
+                  {
+                    entries: lorebook.entries.map((e, i) => ({
+                      keys: e.keys,
+                      content: e.content,
+                      extensions: {},
+                      enabled: e.enabled,
+                      insertion_order: e.insertion_order,
+                      case_sensitive: false,
+                      name: e.comment,
+                      comment: e.comment,
+                      selective: e.selective,
+                      secondary_keys: e.secondary_keys,
+                      constant: e.constant,
+                      position: e.position,
+                    })),
+                    name: lorebook.name,
+                    extensions: {},
+                    scan_depth: lorebook.scan_depth,
+                    token_budget: lorebook.token_budget,
+                    recursive_scanning: lorebook.recursive_scanning,
+                  },
+                  lorebook.name
+                )}
+                className="menu_button confirm"
+              >
+                <i className="fa-solid fa-download"></i> Export Lorebook JSON
+              </STButton>
+              <STButton
+                onClick={() => setLorebook(createEmptyLorebook())}
+                className="menu_button warning"
+              >
+                <i className="fa-solid fa-trash"></i> Clear Lorebook
+              </STButton>
+            </>
+          )}
         </div>
       </div>
 
