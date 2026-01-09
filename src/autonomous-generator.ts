@@ -169,9 +169,109 @@ Example with alternate greetings:
 
 CRITICAL: Return ONLY valid JSON. No markdown code blocks, no explanations outside the JSON.`;
 
-/**
- * Generate a full character from a single prompt
- */
+
+const CLEANER_PROMPT = `You are an expert data cleaner. Your task is to process files scraped from the web and remove all technical noise (navigation, ads, social links, excessive HTML/JSON/Markdown structural overhead).
+
+CLEANING MODE: {{mode}}
+
+{{#if (eq mode "strip")}}
+MODE INSTRUCTIONS: 
+1. PRESERVE ALL core lore, story, facts, or descriptions.
+2. DO NOT summarize or shorten the content. Keep every detail, dialogue, and fact intact.
+3. Remove ONLY technical clutter and formatting noise.
+{{/if}}
+
+{{#if (eq mode "summary")}}
+MODE INSTRUCTIONS: 
+1. Extract the core lore and facts.
+2. Perform a LIGHT summary: maintain key details and dialogue, but remove repetitive or less important filler text.
+3. Ensure the result is readable and concise while still capturing the essence of the lore.
+{{/if}}
+
+{{#if (eq mode "heavy_summary")}}
+MODE INSTRUCTIONS: 
+1. Perform a HEAVY summary. Extract ONLY the most critical facts, lore, and character traits.
+2. Be extremely concise. Condense long paragraphs into a few bullet points or short sentences.
+3. Remove everything except the absolute essentials needed for world-building or character context.
+{{/if}}
+
+GENERAL RULES:
+1. Convert everything to clean PLAIN TEXT.
+2. Separate each cleaned file with a clear header: [START_FILE: filename] and [END_FILE: filename].
+
+{{#if additionalInstructions}}
+SPECIAL USER GUIDELINES (Priority: High):
+{{additionalInstructions}}
+{{/if}}
+
+Files to process:
+{{filesToClean}}
+
+CRITICAL: Return ONLY the cleaned files using the [START_FILE: filename] and [END_FILE: filename] tags. No explanations.`;
+
+export async function cleanFiles({
+    files,
+    profileId,
+    mode = 'strip',
+    additionalInstructions,
+}: {
+    files: { name: string; content: string }[];
+    profileId: string;
+    mode?: 'strip' | 'summary' | 'heavy_summary';
+    additionalInstructions?: string;
+}): Promise<{ name: string; content: string }[]> {
+    try {
+        const Handlebars = await import('handlebars');
+
+        // Register eq helper for mode selection
+        if (!Handlebars.helpers['eq']) {
+            Handlebars.registerHelper('eq', (a, b) => a === b);
+        }
+
+        const template = Handlebars.compile(CLEANER_PROMPT);
+
+        const filesToClean = files.map(f => `--- ORIGINAL FILE: ${f.name} ---\n${f.content}\n--- END ORIGINAL ---`).join('\n\n');
+        const fullPrompt = template({ filesToClean, additionalInstructions, mode });
+
+        const response = await globalContext.ConnectionManagerRequestService.sendRequest(
+            profileId,
+            [{ role: 'user', content: fullPrompt }],
+            4096, // High token limit for multiple files
+        ) as any;
+
+        if (!response || !response.content) {
+            throw new Error('No response from AI');
+        }
+
+        const text = response.content.trim();
+        const results: { name: string; content: string }[] = [];
+
+        // Match [START_FILE: name] content [END_FILE: name]
+        const fileRegex = /\[START_FILE:\s*(.+?)\]([\s\S]*?)\[END_FILE:\s*\1\]/g;
+        let match;
+
+        while ((match = fileRegex.exec(text)) !== null) {
+            results.push({
+                name: match[1].trim(),
+                content: match[2].trim()
+            });
+        }
+
+        if (results.length === 0) {
+            // Fallback: if AI didn't use tags correctly but we only sent one file
+            if (files.length === 1) {
+                return [{ name: files[0].name, content: text }];
+            }
+            throw new Error('AI failed to return files in the requested format (missing tags).');
+        }
+
+        return results;
+    } catch (error: any) {
+        console.error('Cleaning error:', error);
+        throw new Error(`Failed to clean files: ${error.message || String(error)}`);
+    }
+}
+
 export async function generateFullCharacter(
     prompt: string,
     includeLorebook: boolean,

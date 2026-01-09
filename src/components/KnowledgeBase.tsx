@@ -6,9 +6,11 @@ export interface KBFile {
     id: string;
     name: string;
     content: string;
+    originalContent?: string;
     enabled: boolean;
     size: number;
     tokens?: number;
+    cleanMode?: 'strip' | 'summary' | 'heavy_summary' | 'rejected';
 }
 
 interface KnowledgeBaseProps {
@@ -51,6 +53,7 @@ export const KnowledgeBase: FC<KnowledgeBaseProps> = ({ files, onFilesChange }) 
                         id: `kb_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
                         name: file.name,
                         content: content,
+                        originalContent: content, // Save original state
                         enabled: true,
                         size: file.size
                     });
@@ -72,6 +75,15 @@ export const KnowledgeBase: FC<KnowledgeBaseProps> = ({ files, onFilesChange }) 
 
     const deleteFile = (id: string) => {
         onFilesChange(files.filter(f => f.id !== id));
+    };
+
+    const revertFile = (id: string) => {
+        onFilesChange(files.map(f => {
+            if (f.id === id && f.originalContent) {
+                return { ...f, content: f.originalContent, cleanMode: undefined };
+            }
+            return f;
+        }));
     };
 
     const clearAllFiles = async () => {
@@ -282,6 +294,14 @@ export const KnowledgeBase: FC<KnowledgeBaseProps> = ({ files, onFilesChange }) 
                                 }}>
                                     {file.name}
                                 </span>
+                                {file.cleanMode && (
+                                    <span title={`Cleaned: ${file.cleanMode}`} style={{ fontSize: '0.8em', opacity: 0.8 }}>
+                                        {file.cleanMode === 'strip' && ' 🧹'}
+                                        {file.cleanMode === 'summary' && ' 🗜️'}
+                                        {file.cleanMode === 'heavy_summary' && ' 📦'}
+                                        {file.cleanMode === 'rejected' && ' ❌'}
+                                    </span>
+                                )}
                                 <div style={{ display: 'flex', gap: '4px', fontSize: '0.75em', opacity: 0.6, whiteSpace: 'nowrap' }}>
                                     <span>({Math.round(file.size / 1024)}KB)</span>
                                     {file.tokens !== undefined ? (
@@ -291,12 +311,23 @@ export const KnowledgeBase: FC<KnowledgeBaseProps> = ({ files, onFilesChange }) 
                                     )}
                                 </div>
                             </div>
-                            <div
-                                onClick={() => deleteFile(file.id)}
-                                style={{ cursor: 'pointer', opacity: 0.6, padding: '2px 6px' }}
-                                title="Remove file"
-                            >
-                                <i className="fa-solid fa-times"></i>
+                            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                                {file.cleanMode && (
+                                    <div
+                                        onClick={() => revertFile(file.id)}
+                                        style={{ cursor: 'pointer', opacity: 0.6, fontSize: '0.8em' }}
+                                        title="Revert to original"
+                                    >
+                                        <i className="fa-solid fa-undo"></i>
+                                    </div>
+                                )}
+                                <div
+                                    onClick={() => deleteFile(file.id)}
+                                    style={{ cursor: 'pointer', opacity: 0.6, padding: '2px 6px' }}
+                                    title="Remove file"
+                                >
+                                    <i className="fa-solid fa-times"></i>
+                                </div>
                             </div>
                         </div>
                     ))

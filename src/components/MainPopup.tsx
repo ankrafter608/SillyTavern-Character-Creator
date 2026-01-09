@@ -32,6 +32,7 @@ import { ChatMessage, generateFullCharacter, applyCharacterToSession } from '../
 import { AutonomousMode } from './AutonomousMode.js';
 import { exportCharacterAsJSON, exportLorebookAsJSON } from '../character-exporter.js';
 import { CharacterCreatorSettings } from './Settings.js';
+import { Cleaner } from './Cleaner.js';
 
 if (!Handlebars.helpers['join']) {
   Handlebars.registerHelper('join', function (array: any, separator: any) {
@@ -95,7 +96,7 @@ export const MainPopup: FC = () => {
   const [isGenerating, setIsGenerating] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'core' | 'draft'>('core');
-  const [creatorMode, setCreatorMode] = useState<'character' | 'lorebook' | 'autonomous' | 'settings'>('character');
+  const [creatorMode, setCreatorMode] = useState<'character' | 'lorebook' | 'autonomous' | 'cleaner' | 'settings'>('character');
   const [lorebook, setLorebook] = useState<LorebookData>(createEmptyLorebook());
   const [kbFiles, setKbFiles] = useState<KBFile[]>([]);
   const [isAutonomousGenerating, setIsAutonomousGenerating] = useState(false);
@@ -676,6 +677,12 @@ export const MainPopup: FC = () => {
           <i className="fa-solid fa-book"></i> Lorebook
         </button>
         <button
+          className={`mode-tab ${creatorMode === 'cleaner' ? 'active' : ''}`}
+          onClick={() => setCreatorMode('cleaner')}
+        >
+          <i className="fa-solid fa-broom"></i> Cleaner
+        </button>
+        <button
           className={`mode-tab ${creatorMode === 'settings' ? 'active' : ''}`}
           onClick={() => setCreatorMode('settings')}
         >
@@ -1125,6 +1132,16 @@ export const MainPopup: FC = () => {
           additionalInstructions={settings.promptPresets[settings.promptPreset]?.content}
           messages={autonomousMessages}
           onMessagesChange={setAutonomousMessages}
+        />
+      )}
+
+      {/* CLEANER MODE */}
+      {creatorMode === 'cleaner' && (
+        <Cleaner
+          kbFiles={kbFiles}
+          onFilesUpdate={setKbFiles}
+          profileId={settings.profileId}
+          additionalInstructions={settings.promptPresets[settings.promptPreset]?.content}
         />
       )}
 
